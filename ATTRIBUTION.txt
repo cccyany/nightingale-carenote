@@ -1,0 +1,97 @@
+NIGHTINGALE CARENOTE
+EXTERNAL LIBRARIES, MODELS, AND SERVICES
+
+This file records external software, libraries, models, services,
+assets, and other third-party resources used in this project.
+
+IMPORTANT:
+License information must be verified against the authoritative
+package/repository/source before final submission.
+
+==================================================
+APPLICATION FRAMEWORK
+==================================================
+
+Next.js
+Purpose:
+License:
+Source:
+
+React
+Purpose:
+License:
+Source:
+
+==================================================
+UI / STYLING
+==================================================
+
+Tailwind CSS
+Purpose:
+License:
+Source:
+
+[Add additional UI libraries actually used.]
+
+==================================================
+DATABASE / AUTHENTICATION
+==================================================
+
+Supabase
+Purpose:
+License / service terms:
+Source:
+
+PostgreSQL
+Purpose:
+License:
+Source:
+
+==================================================
+AI / MODELS
+==================================================
+
+[Model/provider actually used]
+Purpose:
+Model:
+Terms / license:
+Source:
+
+==================================================
+TESTING
+==================================================
+
+pytest
+Purpose:
+License:
+Source:
+
+[Add Playwright or other test libraries only if actually used.]
+
+==================================================
+VOICE / TRANSCRIPTION
+==================================================
+
+[Only include if implemented.]
+
+==================================================
+ICONS / ASSETS
+==================================================
+
+[List icon libraries, fonts, images, or other third-party assets
+actually included in the project.]
+
+==================================================
+OTHER DEPENDENCIES
+==================================================
+
+[Add all other externally sourced libraries or resources used.]
+
+==================================================
+NOTES
+==================================================
+
+- Synthetic patient data only.
+- No real patient records or PHI are included in the repository.
+- Do not list tools that were considered but not actually used.
+- Verify all licenses and service terms before submission.
