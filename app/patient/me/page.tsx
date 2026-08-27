@@ -1,4 +1,5 @@
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import Link from "next/link";
+import { createSupabaseActorClient } from "@/lib/supabase/request";
 
 export const dynamic = "force-dynamic";
 
@@ -15,8 +16,25 @@ function displayToken(value: string) {
   return value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-export default async function PatientMePage() {
-  const supabase = createSupabaseAdminClient();
+export default async function PatientMePage({
+  searchParams
+}: {
+  searchParams?: Promise<{ demo?: string }>;
+}) {
+  const demo = (await searchParams)?.demo;
+  if (!demo || demo !== "demo-patient") {
+    return (
+      <main className="mx-auto min-h-screen max-w-4xl px-4 py-8 sm:px-6">
+        <section className="rounded-md border border-stone-300 bg-white p-5">
+          <h1 className="text-3xl font-semibold">Choose a demo role</h1>
+          <p className="mt-2 text-stone-700">Patient content is loaded through a patient-authenticated Supabase session.</p>
+          <Link className="mt-4 inline-block rounded-md bg-teal-700 px-4 py-2 text-white" href="/login">Demo roles</Link>
+        </section>
+      </main>
+    );
+  }
+
+  const supabase = await createSupabaseActorClient(demo);
   const [{ data: entries, error }, { data: approvedContent, error: contentError }] = await Promise.all([
     supabase
       .from("care_entries")

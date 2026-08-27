@@ -17,10 +17,10 @@ export default function Home() {
         <Link className="rounded-md bg-teal-700 px-4 py-2 text-white" href="/login">
           Demo roles
         </Link>
-        <Link className="rounded-md border border-stone-300 px-4 py-2" href="/patients">
+        <Link className="rounded-md border border-stone-300 px-4 py-2" href="/patients?demo=demo-staff">
           Patients
         </Link>
-        <Link className="rounded-md border border-stone-300 px-4 py-2" href="/patient/me">
+        <Link className="rounded-md border border-stone-300 px-4 py-2" href="/patient/me?demo=demo-patient">
           Patient view
         </Link>
       </nav>

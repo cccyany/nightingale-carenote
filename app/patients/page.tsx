@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { createSupabaseActorClient } from "@/lib/supabase/request";
 
 function firstName(value: { name: string } | { name: string }[] | null): string {
   if (Array.isArray(value)) return value[0]?.name ?? "Clinic";
@@ -10,8 +10,25 @@ function dob(value: string) {
   return new Intl.DateTimeFormat("en-SG", { dateStyle: "medium", timeZone: "Asia/Singapore" }).format(new Date(value));
 }
 
-export default async function PatientsPage() {
-  const supabase = createSupabaseAdminClient();
+export default async function PatientsPage({
+  searchParams
+}: {
+  searchParams?: Promise<{ demo?: string }>;
+}) {
+  const demo = (await searchParams)?.demo;
+  if (!demo) {
+    return (
+      <main className="mx-auto min-h-screen max-w-5xl px-6 py-10">
+        <section className="rounded-md border border-stone-300 bg-white p-5">
+          <h1 className="text-3xl font-semibold">Choose a demo role</h1>
+          <p className="mt-2 text-stone-700">Patient lists are loaded through role-authenticated Supabase sessions.</p>
+          <Link className="mt-4 inline-block rounded-md bg-teal-700 px-4 py-2 text-white" href="/login">Demo roles</Link>
+        </section>
+      </main>
+    );
+  }
+
+  const supabase = await createSupabaseActorClient(demo);
   const { data: patients, error } = await supabase
     .from("patients")
     .select("id, display_name, date_of_birth, clinics(name)")
@@ -32,7 +49,7 @@ export default async function PatientsPage() {
           return (
             <Link
               className={`block p-4 hover:bg-stone-50 ${clinic === "Clinic B" ? "bg-stone-50" : ""}`}
-              href={`/patients/${patient.id}`}
+              href={`/patients/${patient.id}?demo=${encodeURIComponent(demo)}`}
               key={patient.id}
             >
               <div className="flex flex-wrap items-center gap-2">

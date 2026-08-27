@@ -69,7 +69,7 @@ Unsupported or ambiguous evidence abstains into `needs_review`; it is not promot
 
 ## 3. Safety, Evaluation, and Tradeoffs
 
-RBAC and PostgreSQL RLS enforce patient isolation, clinic isolation, role ownership, internal comment hiding, raw AI note hiding, and patient approval gates. The optimized `read_patient_glance` RPC is `SECURITY DEFINER` but fixes `search_path = public` and performs explicit clinic-role authorization before returning rows.
+RBAC and PostgreSQL RLS enforce patient isolation, clinic isolation, role ownership, internal comment hiding, raw AI note hiding, and patient approval gates. The optimized `read_patient_glance` RPC is `SECURITY DEFINER` but fixes `search_path = public` and performs explicit clinic-role authorization before returning rows. TLS and encryption at rest are documented as Supabase/PostgreSQL hosting assumptions; the repository verifies application behavior but does not independently audit provider infrastructure encryption controls.
 
 PHI safety uses a centralized pre-LLM redaction gate:
 
@@ -77,7 +77,7 @@ raw input -> redact -> verify -> provider.
 
 The gateway detects synthetic names, Singapore NRIC/FIN-like IDs, phone numbers, emails, and structured identifiers. It records metadata without original PHI and blocks high-risk calls when verification cannot establish a safe provider payload.
 
-Performance evidence: `npm.cmd run benchmark:glance` measures the warm Supabase/PostgREST read model with 10 warm-up requests and 50 measured requests at concurrency 1. Latest result: P50 169.25 ms, P95 203.45 ms, P99 223.16 ms, failures 0, network included, target met.
+Performance evidence: `npm.cmd run benchmark:glance` measures the warm Supabase/PostgREST read model with 10 warm-up requests and 50 measured requests at concurrency 1. Latest result: P50 157.74 ms, P95 197.7 ms, P99 735.03 ms, failures 0, network included, target met.
 
 Evaluation fixtures are synthetic and intentionally limited. Current fixture report: redaction recall 1.00 on 5 cases with 1 measurable false positive; extraction matched 7/9 expected candidates with 7 trusted provenance-resolvable candidates; abstention matched 2/2 expected cases; conflict behavior matched 6/6 deterministic cases. These results are prototype evidence, not clinical validation.
 

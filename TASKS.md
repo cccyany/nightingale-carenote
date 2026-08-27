@@ -721,41 +721,41 @@ Privacy:
 
 ## M39 — Independent Codex Review
 
-- [ ] Review repository against every Candidate Brief requirement
-- [ ] Classify requirements as PASS / PARTIAL / FAIL / UNVERIFIABLE
-- [ ] Check server-side RBAC
-- [ ] Check clinic isolation
-- [ ] Check provenance resolution
-- [ ] Check PHI redaction
-- [ ] Check risk semantics
-- [ ] Check evidence confidence semantics
-- [ ] Check abstention
-- [ ] Check conflict handling
-- [ ] Check self-learning safety
-- [ ] Check performance evidence
-- [ ] Save findings to REVIEW.md
+- [x] Review repository against every Candidate Brief requirement
+- [x] Classify requirements as PASS / PARTIAL / FAIL / UNVERIFIABLE
+- [x] Check server-side RBAC
+- [x] Check clinic isolation
+- [x] Check provenance resolution
+- [x] Check PHI redaction
+- [x] Check risk semantics
+- [x] Check evidence confidence semantics
+- [x] Check abstention
+- [x] Check conflict handling
+- [x] Check self-learning safety
+- [x] Check performance evidence
+- [x] Save findings to REVIEW.md
 
 ## M40 — Fix Critical Gaps
 
-- [ ] Fix all hard-requirement FAIL items
-- [ ] Re-run complete test suite
-- [ ] Fix critical PARTIAL items
-- [ ] Do not add unrelated features
+- [x] Fix all hard-requirement FAIL items
+- [x] Re-run complete test suite
+- [x] Fix critical PARTIAL items
+- [x] Do not add unrelated features
 
 ## M41 — Final Technical Verification
 
-- [ ] npm run lint passes
-- [ ] npm run typecheck passes
-- [ ] frontend tests pass
-- [ ] pytest passes
-- [ ] all required micro-tests pass
-- [ ] P95 Glance benchmark is documented and <= 300 ms
-- [ ] repository contains synthetic data only
-- [ ] no secrets are committed
-- [ ] .env is gitignored
+- [x] npm run lint passes
+- [x] npm run typecheck passes
+- [x] frontend tests pass
+- [x] pytest passes
+- [x] all required micro-tests pass
+- [x] P95 Glance benchmark is documented and <= 300 ms
+- [x] repository contains synthetic data only
+- [x] no secrets are committed
+- [x] .env is gitignored
 - [ ] deployed application works
-- [ ] README is complete
-- [ ] Technical Brief is complete
-- [ ] ATTRIBUTION.txt is complete
-- [ ] Demo video scenarios are technically ready
+- [x] README is complete
+- [x] Technical Brief is complete
+- [x] ATTRIBUTION.txt is complete
+- [x] Demo video scenarios are technically ready
 - [ ] git status is clean

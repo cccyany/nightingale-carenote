@@ -25,23 +25,31 @@ export default async function HistoryPage({
   searchParams
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ entry?: string }>;
+  searchParams: Promise<{ demo?: string; entry?: string }>;
 }) {
   const { id } = await params;
-  const { entry: entryId } = await searchParams;
+  const { demo, entry: entryId } = await searchParams;
+  if (!demo) {
+    return (
+      <main className="mx-auto min-h-screen max-w-4xl px-6 py-10">
+        <p>Select a demo role before opening revision history.</p>
+        <Link className="mt-3 inline-block underline" href="/login">Demo roles</Link>
+      </main>
+    );
+  }
   if (!entryId) {
     return (
       <main className="mx-auto min-h-screen max-w-4xl px-6 py-10">
         <p>Select revision history from a timeline entry.</p>
-        <Link className="mt-3 inline-block underline" href={`/patients/${id}`}>Back to CareNote</Link>
+        <Link className="mt-3 inline-block underline" href={`/patients/${id}?demo=${encodeURIComponent(demo)}`}>Back to CareNote</Link>
       </main>
     );
   }
-  const { entry, versions } = await getEntryHistory(entryId);
+  const { entry, versions } = await getEntryHistory(entryId, demo);
 
   return (
     <main className="mx-auto min-h-screen max-w-4xl px-6 py-10">
-      <Link className="underline" href={`/patients/${id}`}>Back to CareNote</Link>
+      <Link className="underline" href={`/patients/${id}?demo=${encodeURIComponent(demo)}`}>Back to CareNote</Link>
       <h1 className="mt-4 text-3xl font-semibold">Revision history</h1>
       <p className="mt-1 text-stone-700">{displayToken(entry.entry_type)} / current version {entry.current_version}</p>
       <div className="mt-5 space-y-3">

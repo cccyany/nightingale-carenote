@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-27T13:04:03.985Z",
+  "generated_at": "2026-08-27T13:21:10.134Z",
   "environment": "direct Supabase PostgREST from local benchmark script",
   "endpoint": "POST /rest/v1/rpc/read_patient_glance persisted warm read",
   "patient_id": "30000000-0000-0000-0000-000000000001",
@@ -9,26 +9,26 @@
   "includes_network_latency": true,
   "warm_path_has_llm_call": false,
   "warm_path_has_extraction": false,
-  "auth_token_ms": 623.49,
+  "auth_token_ms": 482.43,
   "nextjs_route_measured": false,
   "nextjs_route_note": "This benchmark measures the Supabase/PostgREST warm read path used by the Next.js route; it does not start a local Next.js server.",
   "secondary_reads": "none on warm Glance read; provenance pointers are returned without hydration",
   "failures": 0,
-  "p50_ms": 169.25,
-  "p95_ms": 203.45,
-  "p99_ms": 223.16,
+  "p50_ms": 157.74,
+  "p95_ms": 197.7,
+  "p99_ms": 735.03,
   "direct_database_rpc_ms": {
     "measured_requests": 50,
     "warmup_requests": 10,
-    "p50_ms": 334.7,
-    "p95_ms": 414.88,
-    "p99_ms": 431.05,
+    "p50_ms": 314.46,
+    "p95_ms": 521.91,
+    "p99_ms": 616.52,
     "note": "Direct pooler timing includes multiple client-server round trips: begin, auth claim setup, RPC select, rollback.",
     "database_execution_ms_from_explain_analyze": {
       "samples": 10,
       "p50_ms": 0.42,
-      "p95_ms": 0.48,
-      "p99_ms": 0.48
+      "p95_ms": 0.62,
+      "p99_ms": 0.62
     }
   },
   "target_p95_ms": 300,

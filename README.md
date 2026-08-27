@@ -91,6 +91,8 @@ PostgreSQL RLS protects base tables. Patients cannot retrieve raw AI-scribed not
 
 The optimized `read_patient_glance` RPC is `SECURITY DEFINER` with fixed `search_path = public`, explicit patient lookup, and an explicit `user_has_clinic_role` check before returning Clinic-scoped rows.
 
+TLS and encryption at rest are deployment assumptions of the configured Supabase/PostgreSQL hosting environment. This repository verifies application RBAC/RLS behavior, but it does not independently audit Supabase infrastructure encryption controls.
+
 ## Collaboration, Revisions, and Concurrency
 
 Staff create staff notes; clinicians create clinician notes. Each edit creates an immutable `entry_versions` snapshot and increments `current_version`. Reverting creates a new version containing the older content; intermediate versions remain. Audit events store actor/action/resource/version metadata, not raw clinical note text.
@@ -155,9 +157,9 @@ Latest measured warm Supabase/PostgREST path in `docs/performance/glance-benchma
 - measured requests: 50
 - concurrency: 1
 - network included: yes
-- P50: 169.25 ms
-- P95: 203.45 ms
-- P99: 223.16 ms
+- P50: 157.74 ms
+- P95: 197.7 ms
+- P99: 735.03 ms
 - failures: 0
 - target: P95 <= 300 ms
 - result: target met

@@ -37,13 +37,25 @@ export default async function PatientPage({
   searchParams
 }: {
   params: Promise<{ id: string }>;
-  searchParams?: Promise<{ filter?: string; source?: string; span?: string }>;
+  searchParams?: Promise<{ demo?: string; filter?: string; source?: string; span?: string }>;
 }) {
   const { id } = await params;
   const resolvedSearch = await searchParams;
+  const demo = resolvedSearch?.demo;
+  if (!demo) {
+    return (
+      <main className="mx-auto min-h-screen max-w-5xl px-6 py-10">
+        <section className="rounded-md border border-stone-300 bg-white p-5">
+          <h1 className="text-3xl font-semibold">Choose a demo role</h1>
+          <p className="mt-2 text-stone-700">CareNote pages load through role-authenticated Supabase sessions.</p>
+          <Link className="mt-4 inline-block rounded-md bg-teal-700 px-4 py-2 text-white" href="/login">Demo roles</Link>
+        </section>
+      </main>
+    );
+  }
   const filter = filterForRole(resolvedSearch?.filter ?? "all");
-  const result = await getPatientCareNote(id, filter);
-  const assignableUsers = await getClinicAssignableUsers(result.patient.clinic_id);
+  const result = await getPatientCareNote(id, filter, demo);
+  const assignableUsers = await getClinicAssignableUsers(result.patient.clinic_id, demo);
   const sourceEntryId = resolvedSearch?.source;
   const sourceSpanId = resolvedSearch?.span;
   const sourceSpan = result.glanceItems.find(
@@ -66,7 +78,7 @@ export default async function PatientPage({
             <h1 className="mt-2 text-3xl font-semibold">{result.patient.display_name}</h1>
             <p className="mt-1 text-stone-700">DOB {dateLabel(result.patient.date_of_birth)} / synthetic demo record</p>
           </div>
-          <Link className="rounded-md border border-stone-300 px-3 py-2 text-sm" href="/patient/me">Patient-safe view</Link>
+          <Link className="rounded-md border border-stone-300 px-3 py-2 text-sm" href="/patient/me?demo=demo-patient">Patient-safe view</Link>
         </div>
       </header>
 
@@ -109,7 +121,7 @@ export default async function PatientPage({
               </details>
               <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
                 {item.provenance_spans?.entry_id ? (
-                  <Link className="rounded-md bg-stone-900 px-3 py-1.5 text-white" href={`/patients/${id}?source=${item.provenance_spans.entry_id}&span=${item.provenance_span_id}#entry-${item.provenance_spans.entry_id}`}>
+                  <Link className="rounded-md bg-stone-900 px-3 py-1.5 text-white" href={`/patients/${id}?demo=${encodeURIComponent(demo)}&source=${item.provenance_spans.entry_id}&span=${item.provenance_span_id}#entry-${item.provenance_spans.entry_id}`}>
                     View Source
                   </Link>
                 ) : null}
@@ -128,7 +140,7 @@ export default async function PatientPage({
             {filters.map(([value, label]) => (
               <Link
                 className={`rounded border px-3 py-1.5 text-sm ${filter === value ? "border-teal-700 bg-teal-50 text-teal-900" : "border-stone-300 bg-white"}`}
-                href={`/patients/${id}?filter=${value}`}
+                href={`/patients/${id}?demo=${encodeURIComponent(demo)}&filter=${value}`}
                 key={value}
               >
                 {label}
@@ -154,7 +166,7 @@ export default async function PatientPage({
                     <span>{displayToken(entry.author_role)}</span>
                     <span>Version {entry.current_version}</span>
                     {entry.author_role === "system" ? <strong className="rounded bg-amber-100 px-2 py-0.5 text-amber-900">AI-scribed / needs verification</strong> : null}
-                    <Link className="ml-auto underline" href={`/patients/${id}/history?entry=${entry.id}`}>Revision history</Link>
+                    <Link className="ml-auto underline" href={`/patients/${id}/history?demo=${encodeURIComponent(demo)}&entry=${entry.id}`}>Revision history</Link>
                   </div>
                   <EvidenceText content={entry.content} evidenceStart={sourceEntryId === entry.id ? sourceSpan?.char_start : null} evidenceEnd={sourceEntryId === entry.id ? sourceSpan?.char_end : null} />
                   {entry.author_role === "staff" || entry.author_role === "clinician" ? <EntryEditor entry={entry} /> : null}

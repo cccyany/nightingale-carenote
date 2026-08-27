@@ -1,4 +1,4 @@
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { createSupabaseActorClient } from "@/lib/supabase/request";
 
 export type TimelineFilter = "all" | "ai" | "clinician" | "staff" | "patient" | "system";
 type RelationObject = Record<string, unknown> | null;
@@ -159,7 +159,12 @@ export function filterForRole(role: string): TimelineFilter {
   return "all";
 }
 
-export async function getPatientCareNote(patientId: string, filter: TimelineFilter = "all"): Promise<{
+async function careReadClient(actorToken?: string) {
+  if (actorToken) return createSupabaseActorClient(actorToken);
+  throw new Error("A role-authenticated actor token is required to read CareNote data.");
+}
+
+export async function getPatientCareNote(patientId: string, filter: TimelineFilter = "all", actorToken?: string): Promise<{
   patient: CareNotePatient;
   entries: CareNoteEntry[];
   comments: CareNoteComment[];
@@ -169,7 +174,7 @@ export async function getPatientCareNote(patientId: string, filter: TimelineFilt
   factConflicts: FactConflict[];
   patientFacingContent: PatientFacingContent[];
 }> {
-  const supabase = createSupabaseAdminClient();
+  const supabase = await careReadClient(actorToken);
   const { data: patient, error: patientError } = await supabase
     .from("patients")
     .select("id, clinic_id, display_name, date_of_birth, clinics(name)")
@@ -260,11 +265,11 @@ export async function getPatientCareNote(patientId: string, filter: TimelineFilt
   };
 }
 
-export async function getEntryHistory(entryId: string): Promise<{
+export async function getEntryHistory(entryId: string, actorToken?: string): Promise<{
   entry: CareNoteEntry;
   versions: EntryVersion[];
 }> {
-  const supabase = createSupabaseAdminClient();
+  const supabase = await careReadClient(actorToken);
   const [{ data: entry, error: entryError }, { data: versions, error: versionsError }] = await Promise.all([
     supabase.from("care_entries").select(entrySelect).eq("id", entryId).single(),
     supabase
@@ -283,8 +288,8 @@ export async function getEntryHistory(entryId: string): Promise<{
   };
 }
 
-export async function getClinicAssignableUsers(clinicId: string): Promise<AssignableUser[]> {
-  const supabase = createSupabaseAdminClient();
+export async function getClinicAssignableUsers(clinicId: string, actorToken?: string): Promise<AssignableUser[]> {
+  const supabase = await careReadClient(actorToken);
   const { data, error } = await supabase
     .from("clinic_memberships")
     .select("profile_id, role, profiles:profile_id(display_name)")
