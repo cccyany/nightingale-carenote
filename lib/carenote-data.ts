@@ -57,6 +57,8 @@ export type GlanceItem = {
   risk_reason: string;
   importance_score: number;
   importance_reasons: Record<string, number>;
+  storage_class: string;
+  ranking_explanation: string;
   provenance_span_id: string;
   available_action: string;
   confirmation_status: string;
@@ -99,6 +101,8 @@ export type PatientFacingContent = {
   provenance_span_id: string | null;
   approved_at: string | null;
   created_at: string;
+  review_status: string;
+  evidence_confidence: number;
 };
 export type AssignableUser = {
   profile_id: string;
@@ -211,7 +215,7 @@ export async function getPatientCareNote(patientId: string, filter: TimelineFilt
         .order("created_at", { ascending: false }),
       supabase
         .from("glance_items")
-        .select("id, highlight_id, title, short_summary, status, risk, risk_reason, importance_score, importance_reasons, provenance_span_id, available_action, confirmation_status, evidence_label, evidence_explanation, rule_key, provenance_spans:provenance_span_id(entry_id, char_start, char_end, evidence_text, provenance_sources:source_id(source_label))")
+        .select("id, highlight_id, title, short_summary, status, risk, risk_reason, importance_score, importance_reasons, storage_class, ranking_explanation, provenance_span_id, available_action, confirmation_status, evidence_label, evidence_explanation, rule_key, provenance_spans:provenance_span_id(entry_id, char_start, char_end, evidence_text, provenance_sources:source_id(source_label))")
         .eq("patient_id", patientId)
         .neq("status", "rejected")
         .order("importance_score", { ascending: false })
@@ -230,7 +234,7 @@ export async function getPatientCareNote(patientId: string, filter: TimelineFilt
         .limit(8),
       supabase
         .from("patient_facing_content")
-        .select("id, title, body, status, provenance_span_id, approved_at, created_at")
+        .select("id, title, body, status, provenance_span_id, approved_at, created_at, review_status, evidence_confidence")
         .eq("patient_id", patientId)
         .order("created_at", { ascending: false })
         .limit(8)

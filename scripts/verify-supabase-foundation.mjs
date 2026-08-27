@@ -27,6 +27,8 @@ const expectedTables = [
   "importance_feedback",
   "glance_items",
   "patient_facing_content",
+  "transcript_sessions",
+  "transcript_segments",
   "audit_events"
 ];
 
@@ -77,7 +79,16 @@ try {
       "detect_fact_conflicts_for_patient",
       "ingest_ai_scribed_note",
       "create_patient_facing_draft",
-      "set_patient_content_status"
+      "set_patient_content_status",
+      "is_persistent_safety_class",
+      "storage_class_for_item",
+      "adaptive_importance_components",
+      "calculate_importance_components",
+      "rerank_patient_glance",
+      "record_importance_feedback",
+      "create_demo_glance_candidate",
+      "read_patient_glance",
+      "create_transcript_session"
     ]]
   );
 
@@ -90,7 +101,7 @@ try {
     requiredFunctions: functions.rows.map((row) => row.proname).sort()
   }, null, 2));
 
-  if (missingTables.length || missingRls.length || policies.rows[0].count < 12 || functions.rows.length < 16) {
+  if (missingTables.length || missingRls.length || policies.rows[0].count < 12 || functions.rows.length < 25) {
     process.exit(1);
   }
 } finally {

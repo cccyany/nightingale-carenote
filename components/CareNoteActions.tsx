@@ -221,6 +221,51 @@ export function TaskStatusButton({ taskId, status }: { taskId: string; status: s
   return <button className="rounded border border-stone-300 px-2 py-1 text-xs" onClick={submit} type="button">{status === "completed" ? "Reopen" : "Complete"}</button>;
 }
 
+export function HighlightFeedbackButtons({ highlightId }: { highlightId: string }) {
+  const [message, setMessage] = useState("");
+
+  async function submit(feedbackType: "pin" | "clinician_confirmation" | "rejection") {
+    const response = await fetch(`/api/highlights/${highlightId}/feedback`, {
+      method: "POST",
+      headers: authHeaders("clinician"),
+      body: JSON.stringify({ feedbackType })
+    });
+    setMessage(response.ok ? "Feedback recorded." : `Feedback failed (${response.status}).`);
+    if (response.ok) window.location.reload();
+  }
+
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1">
+      <button className="rounded border border-stone-300 px-2 py-1 text-xs" onClick={() => submit("pin")} type="button">Pin</button>
+      <button className="rounded border border-stone-300 px-2 py-1 text-xs" onClick={() => submit("clinician_confirmation")} type="button">Confirm</button>
+      <button className="rounded border border-stone-300 px-2 py-1 text-xs" onClick={() => submit("rejection")} type="button">Reject</button>
+      {message ? <span className="text-xs text-stone-600">{message}</span> : null}
+    </span>
+  );
+}
+
+export function PatientContentStatusButtons({ contentId, status }: { contentId: string; status: string }) {
+  const [message, setMessage] = useState("");
+
+  async function submit(nextStatus: "approved" | "rejected") {
+    const response = await fetch(`/api/patient-content/${contentId}/status`, {
+      method: "POST",
+      headers: authHeaders("clinician"),
+      body: JSON.stringify({ status: nextStatus })
+    });
+    setMessage(response.ok ? `Marked ${nextStatus}.` : `Status change failed (${response.status}).`);
+    if (response.ok) window.location.reload();
+  }
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2">
+      <button className="rounded border border-teal-700 px-2 py-1 text-xs" disabled={status === "approved"} onClick={() => submit("approved")} type="button">Approve</button>
+      <button className="rounded border border-stone-300 px-2 py-1 text-xs" disabled={status === "rejected"} onClick={() => submit("rejected")} type="button">Reject</button>
+      {message ? <span className="text-xs text-stone-600">{message}</span> : null}
+    </div>
+  );
+}
+
 export function RevertButton({
   entryId,
   expectedVersion,

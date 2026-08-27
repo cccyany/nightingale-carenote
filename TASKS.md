@@ -447,14 +447,14 @@ feat(conflicts): detect and review clinical contradictions
 
 ## M24 — Explainable Importance Ranking
 
-- [ ] Implement risk contribution
-- [ ] Implement unresolved action contribution
-- [ ] Implement recency contribution
-- [ ] Implement clinician-confirmation contribution
-- [ ] Implement entity priority
-- [ ] Implement decay
-- [ ] Persist explainable score components
-- [ ] Rank Glance items
+- [x] Implement risk contribution
+- [x] Implement unresolved action contribution
+- [x] Implement recency contribution
+- [x] Implement clinician-confirmation contribution
+- [x] Implement entity priority
+- [x] Implement decay
+- [x] Persist explainable score components
+- [x] Rank Glance items
 
 Suggested commit:
 
@@ -464,16 +464,16 @@ feat(glance): add explainable importance ranking
 
 ## M25 — Adaptive Importance
 
-- [ ] Track exposure
-- [ ] Track manual highlight
-- [ ] Track pin
-- [ ] Track clinician confirmation
-- [ ] Track comments
-- [ ] Track rejection
-- [ ] Calculate clinic-specific adaptive boost
-- [ ] Cap adaptive boost
-- [ ] Prevent learning from lowering safety floors
-- [ ] Treat exposure separately from rejection
+- [x] Track exposure
+- [x] Track manual highlight
+- [x] Track pin
+- [x] Track clinician confirmation
+- [x] Track comments
+- [x] Track rejection
+- [x] Calculate clinic-specific adaptive boost
+- [x] Cap adaptive boost
+- [x] Prevent learning from lowering safety floors
+- [x] Treat exposure separately from rejection
 
 Suggested commit:
 
@@ -483,12 +483,12 @@ feat(learning): add bounded importance feedback
 
 ## M26 — Self-Learning Test
 
-- [ ] Implement tests/test_self_learning_importance.py
-- [ ] Record baseline score
-- [ ] Simulate clinician pin/confirmation
-- [ ] Generate similar future candidate
-- [ ] Assert increased bounded priority
-- [ ] Assert critical risk floor remains unchanged
+- [x] Implement tests/test_self_learning_importance.py
+- [x] Record baseline score
+- [x] Simulate clinician pin/confirmation
+- [x] Generate similar future candidate
+- [x] Assert increased bounded priority
+- [x] Assert critical risk floor remains unchanged
 
 ---
 
@@ -496,25 +496,25 @@ feat(learning): add bounded importance feedback
 
 ## M27 — Patient View
 
-- [ ] Build /patient/me
-- [ ] Display patient's own submitted information
-- [ ] Display approved summaries
-- [ ] Display approved instructions
-- [ ] Hide internal comments
-- [ ] Hide raw AI notes
-- [ ] Hide clinician/staff internal notes
+- [x] Build /patient/me
+- [x] Display patient's own submitted information
+- [x] Display approved summaries
+- [x] Display approved instructions
+- [x] Hide internal comments
+- [x] Hide raw AI notes
+- [x] Hide clinician/staff internal notes
 
 ---
 
 ## M28 — Patient Approval Workflow
 
-- [ ] Create patient-facing AI draft
-- [ ] Default draft to not visible
-- [ ] Add clinician review
-- [ ] Add approve action
-- [ ] Record approver
-- [ ] Record approval timestamp
-- [ ] Only approved content becomes patient-visible
+- [x] Create patient-facing AI draft
+- [x] Default draft to not visible
+- [x] Add clinician review
+- [x] Add approve action
+- [x] Record approver
+- [x] Record approval timestamp
+- [x] Only approved content becomes patient-visible
 
 Suggested commit:
 
@@ -526,13 +526,13 @@ feat(patient): add clinician-approved patient summaries
 
 ## M29 — Data Decay
 
-- [ ] Implement HOT classification
-- [ ] Implement WARM classification
-- [ ] Implement COLD classification
-- [ ] Reduce ranking weight for older ordinary context
-- [ ] Exempt persistent safety information
-- [ ] Preserve source history
-- [ ] Document policy
+- [x] Implement HOT classification
+- [x] Implement WARM classification
+- [x] Implement COLD classification
+- [x] Reduce ranking weight for older ordinary context
+- [x] Exempt persistent safety information
+- [x] Preserve source history
+- [x] Document policy
 
 Suggested commit:
 
@@ -544,15 +544,15 @@ feat(storage): add longitudinal data decay policy
 
 Only start after all core requirements pass.
 
-- [ ] Record/upload synthetic audio
-- [ ] Transcribe audio
-- [ ] Add speaker labels
-- [ ] Add timestamps
-- [ ] Redact before LLM extraction
-- [ ] Create AI-scribed entry
-- [ ] Link summary to transcript timestamps
-- [ ] Mark uncertain transcript segments
-- [ ] Document noisy/multilingual limitations
+- [x] Record/upload synthetic audio
+- [x] Transcribe audio
+- [x] Add speaker labels
+- [x] Add timestamps
+- [x] Redact before LLM extraction
+- [x] Create AI-scribed entry
+- [x] Link summary to transcript timestamps
+- [x] Mark uncertain transcript segments
+- [x] Document noisy/multilingual limitations
 
 Suggested commit:
 
@@ -564,24 +564,24 @@ feat(voice): add synthetic ambient consult capture
 
 ## M31 — Glance Read Model
 
-- [ ] Precompute Glance items
-- [ ] Ensure warm read path has no LLM call
-- [ ] Add indexes
-- [ ] Optimize patient Glance query
+- [x] Precompute Glance items
+- [x] Ensure warm read path has no LLM call
+- [x] Add indexes
+- [x] Optimize patient Glance query
 
 ---
 
 ## M32 — Performance Benchmark
 
-- [ ] Create reproducible benchmark
-- [ ] Run warm requests
-- [ ] Record request count
-- [ ] Record concurrency
-- [ ] Record P50
-- [ ] Record P95
-- [ ] Record P99 where available
+- [x] Create reproducible benchmark
+- [x] Run warm requests
+- [x] Record request count
+- [x] Record concurrency
+- [x] Record P50
+- [x] Record P95
+- [x] Record P99 where available
 - [ ] Verify P95 <= 300 ms
-- [ ] Document methodology
+- [x] Document methodology
 
 Suggested commit:
 
@@ -591,13 +591,13 @@ perf(glance): benchmark warm consult path
 
 ## M33 — Evaluation Fixtures
 
-- [ ] Create redaction_cases.json
-- [ ] Create extraction_cases.json
-- [ ] Create conflict_cases.json
-- [ ] Measure provenance resolution
-- [ ] Measure redaction recall
-- [ ] Record abstention cases
-- [ ] Document limitations
+- [x] Create redaction_cases.json
+- [x] Create extraction_cases.json
+- [x] Create conflict_cases.json
+- [x] Measure provenance resolution
+- [x] Measure redaction recall
+- [x] Record abstention cases
+- [x] Document limitations
 
 ---
 

@@ -1,0 +1,50 @@
+[
+  {
+    "id": "allergy_contradiction",
+    "facts": [
+      { "source": "clinician", "type": "allergy", "entity": "penicillin", "assertion": "present" },
+      { "source": "ai_nurse", "type": "allergy", "entity": "penicillin", "assertion": "absent" }
+    ],
+    "expected_conflict": "ALLERGY_CONFLICT"
+  },
+  {
+    "id": "medication_contradiction",
+    "facts": [
+      { "source": "clinician", "type": "medication", "entity": "metformin", "assertion": "present" },
+      { "source": "ai_doctor", "type": "medication", "entity": "metformin", "assertion": "absent" }
+    ],
+    "expected_conflict": "MEDICATION_CONFLICT"
+  },
+  {
+    "id": "dose_contradiction",
+    "facts": [
+      { "source": "clinician", "type": "dosage", "entity": "metformin", "value": "500", "assertion": "present" },
+      { "source": "ai_doctor", "type": "dosage", "entity": "metformin", "value": "1000", "assertion": "present" }
+    ],
+    "expected_conflict": "MEDICATION_DOSE_CONFLICT"
+  },
+  {
+    "id": "frequency_contradiction",
+    "facts": [
+      { "source": "staff", "type": "frequency", "entity": "metformin", "value": "once daily", "assertion": "present" },
+      { "source": "clinician", "type": "frequency", "entity": "metformin", "value": "twice daily", "assertion": "present" }
+    ],
+    "expected_conflict": "MEDICATION_FREQUENCY_CONFLICT"
+  },
+  {
+    "id": "non_conflict",
+    "facts": [
+      { "source": "staff", "type": "medication", "entity": "metformin", "assertion": "present" },
+      { "source": "clinician", "type": "medication", "entity": "metformin", "assertion": "present" }
+    ],
+    "expected_conflict": null
+  },
+  {
+    "id": "human_human_allergy",
+    "facts": [
+      { "source": "staff", "type": "allergy", "entity": "penicillin", "assertion": "absent" },
+      { "source": "clinician", "type": "allergy", "entity": "penicillin", "assertion": "present" }
+    ],
+    "expected_conflict": "ALLERGY_CONFLICT"
+  }
+]

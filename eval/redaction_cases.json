@@ -1,0 +1,32 @@
+[
+  {
+    "id": "name_phone_id",
+    "text": "Jane Tan S1234567D called from +65 9123 4567.",
+    "expected_classes": ["name", "id", "phone"],
+    "should_allow": true
+  },
+  {
+    "id": "fin_email",
+    "text": "Alex Lim shared FIN F7654321A and alex.lim@example.test.",
+    "expected_classes": ["name", "id", "email"],
+    "should_allow": true
+  },
+  {
+    "id": "multiple_phones",
+    "text": "Use 8123 4567 or 61234567 for synthetic follow-up.",
+    "expected_classes": ["phone"],
+    "should_allow": true
+  },
+  {
+    "id": "safe_clinical_negative",
+    "text": "No known drug allergies. eGFR 65. Repeat renal panel in two weeks.",
+    "expected_classes": [],
+    "should_allow": true
+  },
+  {
+    "id": "unknown_name_abstain",
+    "text": "Taylor Ng reports cough.",
+    "expected_classes": [],
+    "should_allow": false
+  }
+]

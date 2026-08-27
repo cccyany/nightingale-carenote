@@ -1,0 +1,18 @@
+{
+  "generated_at": "2026-08-27T12:02:32.470Z",
+  "environment": "direct Supabase PostgREST from local benchmark script",
+  "endpoint": "POST /rest/v1/rpc/read_patient_glance persisted warm read",
+  "patient_id": "30000000-0000-0000-0000-000000000001",
+  "warmup_requests": 1,
+  "measured_requests": 20,
+  "concurrency": 1,
+  "includes_network_latency": true,
+  "warm_path_has_llm_call": false,
+  "warm_path_has_extraction": false,
+  "failures": 0,
+  "p50_ms": 158.77,
+  "p95_ms": 494.28,
+  "p99_ms": 499,
+  "target_p95_ms": 300,
+  "target_met": false
+}

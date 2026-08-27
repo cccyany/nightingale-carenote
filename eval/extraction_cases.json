@@ -1,0 +1,45 @@
+[
+  {
+    "id": "allergy_present",
+    "entry_id": "fixture-entry-1",
+    "text": "Penicillin allergy documented.",
+    "expected": [{ "type": "allergy", "normalized": "penicillin", "evidence": "Penicillin allergy", "abstain": false }]
+  },
+  {
+    "id": "allergy_absent",
+    "entry_id": "fixture-entry-2",
+    "text": "Patient reports no known drug allergies.",
+    "expected": [{ "type": "allergy", "normalized": "penicillin", "evidence": "no known drug allergies", "abstain": false }]
+  },
+  {
+    "id": "medication_dose_frequency",
+    "entry_id": "fixture-entry-3",
+    "text": "Metformin 500 mg twice daily documented.",
+    "expected": [
+      { "type": "medication", "normalized": "metformin", "evidence": "Metformin", "abstain": false },
+      { "type": "dosage", "normalized": "metformin", "evidence": "Metformin 500 mg", "abstain": false },
+      { "type": "frequency", "normalized": "twice daily", "evidence": "twice daily", "abstain": false }
+    ]
+  },
+  {
+    "id": "symptom_and_followup",
+    "entry_id": "fixture-entry-4",
+    "text": "Patient reports nocturnal cough. Repeat renal panel discussed.",
+    "expected": [
+      { "type": "symptom", "normalized": "nocturnal cough", "evidence": "nocturnal cough", "abstain": false },
+      { "type": "follow_up_action", "normalized": "repeat renal panel", "evidence": "Repeat renal panel", "abstain": false }
+    ]
+  },
+  {
+    "id": "ambiguous_evidence",
+    "entry_id": "fixture-entry-5",
+    "text": "Medication history unclear.",
+    "expected": [{ "type": "medication", "normalized": "unknown", "evidence": "", "abstain": true }]
+  },
+  {
+    "id": "invalid_offsets",
+    "entry_id": "fixture-entry-6",
+    "text": "Metformin active.",
+    "expected": [{ "type": "medication", "normalized": "metformin", "evidence": "metformin stopped", "abstain": true }]
+  }
+]

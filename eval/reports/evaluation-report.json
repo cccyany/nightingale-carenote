@@ -1,0 +1,24 @@
+{
+  "generated_at": "2026-08-27T12:02:26.526Z",
+  "synthetic_only": true,
+  "limitations": "Small synthetic fixture set; do not claim production-grade redaction or extraction accuracy.",
+  "redaction": {
+    "cases": 5,
+    "expected_detections": 7,
+    "missed_detections": 0,
+    "false_positives": 1,
+    "recall": 1
+  },
+  "extraction": {
+    "cases": 6,
+    "expected_candidates": 9,
+    "matched_candidates": 7,
+    "provenance_resolvable_trusted_candidates": 7,
+    "abstention_expected": 2,
+    "abstention_matched": 2
+  },
+  "conflicts": {
+    "cases": 6,
+    "matched_expected_behavior": 6
+  }
+}

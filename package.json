@@ -9,6 +9,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "node --test",
+    "benchmark:glance": "node scripts/benchmark-glance.mjs",
+    "evaluate:fixtures": "node scripts/evaluate-fixtures.mjs",
     "supabase:bootstrap-auth": "node scripts/bootstrap-supabase-demo.mjs",
     "supabase:apply": "node scripts/apply-supabase-foundation.mjs",
     "supabase:verify": "node scripts/verify-supabase-foundation.mjs"

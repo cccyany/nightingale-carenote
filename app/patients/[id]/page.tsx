@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CommentComposer, CommentResolveButton, EntryEditor, NoteComposer, TaskComposer, TaskStatusButton } from "@/components/CareNoteActions";
+import { CommentComposer, CommentResolveButton, EntryEditor, HighlightFeedbackButtons, NoteComposer, PatientContentStatusButtons, TaskComposer, TaskStatusButton } from "@/components/CareNoteActions";
 import { EvidenceText } from "@/components/EvidenceText";
 import { filterForRole, getClinicAssignableUsers, getPatientCareNote } from "@/lib/carenote-data";
 
@@ -67,14 +67,20 @@ export default async function PatientPage({
                     <strong>#{index + 1} {item.title}</strong>
                     <span className={`rounded px-2 py-0.5 ${item.risk === "high" || item.risk === "critical" ? "bg-red-100 text-red-800" : "bg-amber-100 text-amber-800"}`}>{item.risk.toUpperCase()}</span>
                     <span className="rounded bg-stone-100 px-2 py-0.5">{item.status.toUpperCase()}</span>
+                    <span className="rounded bg-teal-50 px-2 py-0.5 text-teal-900">{item.storage_class}</span>
                     <span>{item.evidence_label}</span>
                   </div>
                   <p className="mt-2 text-sm">{item.short_summary}</p>
                   <p className="mt-2 text-xs text-stone-600">Why: {item.risk_reason}</p>
                   <p className="text-xs text-stone-600">Evidence: {item.evidence_explanation}</p>
-                  <p className="text-xs text-stone-600">Rank: score {item.importance_score}; {Object.entries(item.importance_reasons ?? {}).map(([key, value]) => `${key} +${value}`).join(", ")}</p>
+                  <p className="text-xs text-stone-600">Prioritized: {item.ranking_explanation}</p>
+                  <details className="mt-1 text-xs text-stone-600">
+                    <summary>Score components</summary>
+                    <p className="mt-1">Importance {item.importance_score}; {Object.entries(item.importance_reasons ?? {}).filter(([key]) => key !== "adaptive_detail" && key !== "explanations").map(([key, value]) => `${key} ${value}`).join(", ")}</p>
+                  </details>
                   <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
                     <span className="font-medium">{item.available_action}</span>
+                    {item.highlight_id ? <HighlightFeedbackButtons highlightId={item.highlight_id} /> : null}
                     {item.provenance_spans?.entry_id ? (
                       <Link className="underline" href={`/patients/${id}?source=${item.provenance_spans.entry_id}&span=${item.provenance_span_id}#entry-${item.provenance_spans.entry_id}`}>
                         View Source
@@ -186,7 +192,8 @@ export default async function PatientPage({
                     {result.patientFacingContent.map((item) => (
                       <div className="rounded border border-stone-200 p-2" key={item.id}>
                         <strong>{item.title}</strong>
-                        <p className="text-xs text-stone-600">{item.status}</p>
+                        <p className="text-xs text-stone-600">{item.status}; evidence {Number(item.evidence_confidence).toFixed(2)}; review {item.review_status}</p>
+                        <PatientContentStatusButtons contentId={item.id} status={item.status} />
                       </div>
                     ))}
                   </div>
