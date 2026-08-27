@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { requireAiScribePermission } from "@/lib/ai/authorization";
 import { invokeSafeLlm } from "@/lib/ai/safe-gateway";
+import { buildAiScribeContent, transcriptEvidenceSpan } from "@/lib/ai/scribe";
 import { bearerToken, jsonError } from "@/lib/http";
 import { createSupabaseActorClient } from "@/lib/supabase/request";
 
@@ -19,34 +21,66 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
   const token = bearerToken(request);
   if (!token) return jsonError(401, "Unauthorized");
 
+  const supabase = await createSupabaseActorClient(token);
+  const permission = await requireAiScribePermission(supabase, id);
+  if (!permission.ok) return jsonError(permission.status, permission.message);
+
+  const sourceTranscript = `unknown: ${body.data.rawTranscript}`;
   const gateway = await invokeSafeLlm(body.data.rawTranscript, "ai_scribe_structured_ingest");
   if (!gateway.ok) {
     return NextResponse.json(
-      { status: "needs_review", redaction: gateway.auditMetadata },
+      { status: "needs_review", redaction: gateway.auditMetadata, providerError: gateway.providerError ?? null },
       { status: 422 }
     );
   }
 
-  const persistedContent = JSON.stringify({
-    provider: gateway.response.provider,
-    provider_display: gateway.response.providerDisplayName,
-    model: gateway.response.model ?? null,
-    review_state: "unverified",
-    generated: gateway.response.text
+  const { data: session, error: transcriptError } = await supabase.rpc("create_transcript_session", {
+    p_patient_id: id,
+    p_source_label: body.data.sourceLabel,
+    p_segments: [{
+      speaker: "unknown",
+      start_ms: 0,
+      end_ms: Math.max(1000, body.data.rawTranscript.length * 40),
+      text: body.data.rawTranscript,
+      confidence: 0.85,
+      uncertain: false
+    }]
   });
+  if (transcriptError) return jsonError(403, transcriptError.message);
 
-  const supabase = await createSupabaseActorClient(token);
-  const { data, error } = await supabase.rpc("ingest_ai_scribed_note", {
+  const persistedContent = JSON.stringify(buildAiScribeContent(
+    gateway.response,
+    body.data.sourceLabel,
+    session.id
+  ));
+
+  const { data: entryId, error } = await supabase.rpc("ingest_ai_scribed_note", {
     p_patient_id: id,
     p_entry_type: body.data.entryType,
     p_content: persistedContent,
     p_source_label: body.data.sourceLabel,
-    p_session_identifier: body.data.sessionIdentifier ?? null
+    p_session_identifier: session.id
   });
 
   if (error) return jsonError(403, error.message);
+  const evidence = transcriptEvidenceSpan(sourceTranscript);
+  const { data: provenanceSpanId, error: provenanceError } = await supabase.rpc("create_provenance_for_transcript_span", {
+    p_entry_id: entryId,
+    p_source_content: sourceTranscript,
+    p_evidence_text: evidence.evidenceText,
+    p_char_start: evidence.charStart,
+    p_char_end: evidence.charEnd,
+    p_source_label: body.data.sourceLabel,
+    p_session_identifier: session.id,
+    p_transcript_start_ms: 0,
+    p_transcript_end_ms: Math.max(1000, body.data.rawTranscript.length * 40)
+  });
+  if (provenanceError) return jsonError(409, "AI summary was generated but source provenance did not validate.");
+
   return NextResponse.json({
-    entryId: data,
+    entryId,
+    transcriptSessionId: session.id,
+    provenanceSpanId,
     provider: gateway.response.providerDisplayName,
     model: gateway.response.model ?? null,
     redaction: gateway.auditMetadata

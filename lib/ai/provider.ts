@@ -161,8 +161,17 @@ export class GeminiProvider implements LlmProvider {
       })
     });
     if (!response.ok) {
-      const errorText = (await response.text()).slice(0, 500);
-      throw new Error(`Gemini provider failed with ${response.status}: ${errorText}`);
+      const errorText = await response.text();
+      let message = response.statusText || "provider error";
+      try {
+        const payload = JSON.parse(errorText) as { error?: { message?: unknown; status?: unknown } };
+        const providerMessage = typeof payload.error?.message === "string" ? payload.error.message : null;
+        const providerStatus = typeof payload.error?.status === "string" ? payload.error.status : null;
+        message = [providerStatus, providerMessage].filter(Boolean).join(": ") || message;
+      } catch {
+        message = response.statusText || "provider error";
+      }
+      throw new Error(`Gemini provider failed with ${response.status}: ${message}`);
     }
 
     const payload = await response.json() as GeminiGenerateContentResponse;

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AppShell, actorForDemo } from "@/components/AppShell";
 import {
+  AiScribeComposer,
   CommentComposer,
   CommentResolveButton,
   EntryEditor,
@@ -12,7 +13,8 @@ import {
   TaskStatusButton
 } from "@/components/CareNoteActions";
 import { EvidenceText } from "@/components/EvidenceText";
-import { filterForRole, getClinicAssignableUsers, getPatientCareNote, type CareNoteEntry, type GlanceItem } from "@/lib/carenote-data";
+import { getClinicAssignableUsers, getPatientCareNote, type CareNoteEntry, type GlanceItem } from "@/lib/carenote-data";
+import { filterForRole } from "@/lib/timeline-filters";
 
 const filters = [
   ["all", "All"],
@@ -21,6 +23,17 @@ const filters = [
   ["staff", "Staff"],
   ["patient", "Patient"],
   ["system", "System"]
+];
+
+const validationNoisePatterns = [
+  /\bSynthetic safety future\b/i,
+  /\bSynthetic staff-owned note\b/i,
+  /\bSynthetic first writer wins\b/i,
+  /\bSynthetic audit updated content\b/i,
+  /\bSynthetic revision base\b/i,
+  /\bSynthetic low trust draft\b/i,
+  /\bSynthetic provenance base\b/i,
+  /\bSynthetic extraction base\b/i
 ];
 
 function dateLabel(value: string) {
@@ -69,13 +82,17 @@ function parseAiContent(content: string) {
       provider_display?: string;
       model?: string | null;
       review_state?: string;
+      source_label?: string;
+      source_session_identifier?: string | null;
       generated?: string;
     };
     if (parsed && typeof parsed === "object" && typeof parsed.generated === "string") {
       return {
-        body: parsed.generated,
+        body: renderGeneratedSummary(parsed.generated),
         provider: parsed.provider_display ?? parsed.model ?? null,
-        reviewState: parsed.review_state ?? "unverified"
+        reviewState: parsed.review_state ?? "unverified",
+        sourceLabel: parsed.source_label ?? null,
+        sourceSessionIdentifier: parsed.source_session_identifier ?? null
       };
     }
   } catch {
@@ -84,18 +101,48 @@ function parseAiContent(content: string) {
   return null;
 }
 
+function renderGeneratedSummary(generated: string) {
+  try {
+    const parsed = JSON.parse(generated) as { summary?: unknown; key_points?: unknown };
+    const summary = typeof parsed.summary === "string" ? parsed.summary.trim() : "";
+    const keyPoints = Array.isArray(parsed.key_points)
+      ? parsed.key_points.filter((point): point is string => typeof point === "string" && Boolean(point.trim()))
+      : [];
+    if (summary || keyPoints.length) {
+      return [summary, ...keyPoints.map((point) => `- ${point.trim()}`)].filter(Boolean).join("\n");
+    }
+  } catch {
+    return generated;
+  }
+  return generated;
+}
+
 function preview(content: string) {
   const text = content.replace(/\s+/g, " ").trim();
   return text.length > 240 ? `${text.slice(0, 237)}...` : text;
 }
 
+function isValidationNoiseText(text: string) {
+  return validationNoisePatterns.some((pattern) => pattern.test(text));
+}
+
 function isValidationNoiseEntry(entry: CareNoteEntry, sourceEntryId?: string) {
   if (entry.id === sourceEntryId) return false;
-  return /^Synthetic (provenance|extraction) base [0-9a-f-]{36}\.$/i.test(entry.content.trim());
+  return isValidationNoiseText(entry.content.trim());
 }
 
 function isValidationNoiseTask(title: string) {
   return /^Synthetic collaboration follow-up\b/i.test(title.trim());
+}
+
+function isValidationNoiseGlance(item: GlanceItem) {
+  return isValidationNoiseText(`${item.title} ${item.short_summary} ${item.risk_reason}`);
+}
+
+function cleanDemoTitle(title: string) {
+  if (title.startsWith("Synthetic patient approval")) return "Care instruction draft";
+  if (title.startsWith("Synthetic approved summary")) return "Approved care summary";
+  return title.replace(/\s+[0-9a-f-]{36}$/i, "");
 }
 
 function glanceKey(item: GlanceItem) {
@@ -116,6 +163,20 @@ function dedupeGlance(items: GlanceItem[]) {
     seen.add(key);
     return true;
   }).slice(0, 5);
+}
+
+function groupEntriesByDate(entries: CareNoteEntry[]) {
+  const groups: { label: string; entries: CareNoteEntry[] }[] = [];
+  for (const entry of entries) {
+    const label = dateLabel(entry.occurred_at);
+    const existing = groups.find((group) => group.label === label);
+    if (existing) {
+      existing.entries.push(entry);
+    } else {
+      groups.push({ label, entries: [entry] });
+    }
+  }
+  return groups;
 }
 
 function riskClass(risk: string) {
@@ -149,8 +210,12 @@ function componentLabel(key: string) {
 
 function factSummary(fact: { entity_type: string; normalized_entity: string; value: string | null; unit: string | null; assertion: string; authority_role: string } | undefined) {
   if (!fact) return "Source fact unavailable";
-  const value = fact.value ? ` · ${fact.value}${fact.unit ? ` ${fact.unit}` : ""}` : "";
-  return `${displayToken(fact.entity_type)} · ${fact.normalized_entity}${value} · ${displayToken(fact.assertion)} · ${displayToken(fact.authority_role)}`;
+  const value = fact.value ? ` - ${fact.value}${fact.unit ? ` ${fact.unit}` : ""}` : "";
+  return `${displayToken(fact.entity_type)} - ${fact.normalized_entity}${value} - ${displayToken(fact.assertion)} - ${displayToken(fact.authority_role)}`;
+}
+
+function firstTranscriptSpan(entry: CareNoteEntry) {
+  return entry.provenance_spans?.find((span) => span.provenance_sources?.source_kind === "transcript" && span.provenance_sources.source_content) ?? null;
 }
 
 export default async function PatientPage({
@@ -194,23 +259,32 @@ export default async function PatientPage({
   }
   const visibleEntries = result.entries.filter((entry) => !isValidationNoiseEntry(entry, sourceEntryId));
   const visibleTasks = result.tasks.filter((task) => !isValidationNoiseTask(task.title));
+  const visiblePatientFacingContent = result.patientFacingContent.filter((item) => !isValidationNoiseText(`${item.title} ${item.body}`));
   const entryById = new Map(result.entries.map((entry) => [entry.id, entry]));
   const factById = new Map(result.clinicalFacts.map((fact) => [fact.id, fact]));
-  const visibleGlance = dedupeGlance(result.glanceItems);
+  const visibleGlance = dedupeGlance(result.glanceItems.filter((item) => !isValidationNoiseGlance(item)));
   const primaryGlance = visibleGlance.slice(0, 3);
   const secondaryGlance = visibleGlance.slice(3);
-  let currentDate = "";
+  const entryGroups = groupEntriesByDate(visibleEntries);
 
   return (
     <AppShell demo={demo} patientId={id} patientName={result.patient.display_name} clinicName={result.patient.clinics?.name ?? actor?.clinicName}>
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <nav className="mb-3 flex flex-wrap items-center gap-2 text-sm text-stone-600" aria-label="Breadcrumb">
+          <Link className="font-medium text-teal-800 hover:underline focus:outline-none focus:ring-2 focus:ring-teal-600" href={`/patients?demo=${encodeURIComponent(demo)}`}>
+            Patients
+          </Link>
+          <span>/</span>
+          <span className="font-medium text-stone-900">{result.patient.display_name}</span>
+        </nav>
+
         <section className="rounded-md border border-stone-200 bg-white p-5 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">{result.patient.clinics?.name}</p>
               <h1 className="mt-1 text-3xl font-semibold tracking-tight">{result.patient.display_name}</h1>
               <p className="mt-1 text-sm text-stone-600">
-                {age(result.patient.date_of_birth)} · DOB {dateLabel(result.patient.date_of_birth)} · Synthetic demo record
+                {age(result.patient.date_of_birth)} - DOB {dateLabel(result.patient.date_of_birth)} - Synthetic demo record
               </p>
             </div>
             <div className="flex flex-wrap gap-2 text-sm">
@@ -227,7 +301,7 @@ export default async function PatientPage({
               <h2 className="mt-1 text-2xl font-semibold tracking-tight">What needs attention now</h2>
               <p className="mt-1 text-sm text-stone-600">Top ranked, source-linked items. The timeline remains the source of truth.</p>
             </div>
-            <span className="rounded-full bg-teal-50 px-3 py-1 text-sm font-medium text-teal-900">{visibleGlance.length} active items</span>
+            <span className="rounded-full bg-teal-50 px-3 py-1 text-sm font-medium text-teal-900">{visibleGlance.length} active items - showing top {primaryGlance.length}</span>
           </div>
           <div className="mt-4 grid gap-3 lg:grid-cols-3">
             {primaryGlance.length ? primaryGlance.map((item) => (
@@ -245,7 +319,7 @@ export default async function PatientPage({
                   </div>
                   <div>
                     <dt className="font-semibold text-stone-950">Evidence</dt>
-                    <dd className="mt-1 text-stone-700">{item.evidence_label}{item.status === "needs_review" ? " · review needed" : ""} · {item.evidence_explanation}</dd>
+                    <dd className="mt-1 text-stone-700">{item.evidence_label}{item.status === "needs_review" ? " - review needed" : ""} - {item.evidence_explanation}</dd>
                   </div>
                   <div>
                     <dt className="font-semibold text-stone-950">Recommended action</dt>
@@ -266,15 +340,15 @@ export default async function PatientPage({
                       ))}
                     <div>
                       <dt className="font-medium">Recency tier</dt>
-                      <dd>{item.storage_class}</dd>
+                      <dd>{displayToken(item.storage_class)}</dd>
                     </div>
                   </dl>
-                  {item.rule_key ? <p className="mt-2">Deterministic rule: {item.rule_key}</p> : null}
+                  {item.rule_key ? <p className="mt-2">Safety rule: {displayToken(item.rule_key)}</p> : null}
                 </details>
                 <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
                   {item.provenance_spans?.entry_id ? (
-                    <Link className="rounded-md bg-stone-900 px-3 py-1.5 font-medium text-white hover:bg-stone-700 focus:outline-none focus:ring-2 focus:ring-teal-600" href={`/patients/${id}?demo=${encodeURIComponent(demo)}&source=${item.provenance_spans.entry_id}&span=${item.provenance_span_id}#entry-${item.provenance_spans.entry_id}`}>
-                      Review evidence →
+                    <Link className="rounded-md bg-teal-700 px-3 py-1.5 font-medium text-white hover:bg-teal-800 focus:outline-none focus:ring-2 focus:ring-teal-600" href={`/patients/${id}?demo=${encodeURIComponent(demo)}&source=${item.provenance_spans.entry_id}&span=${item.provenance_span_id}#entry-${item.provenance_spans.entry_id}`}>
+                      Review evidence -&gt;
                     </Link>
                   ) : null}
                   {item.highlight_id ? <HighlightFeedbackButtons highlightId={item.highlight_id} /> : null}
@@ -318,81 +392,104 @@ export default async function PatientPage({
             </nav>
 
             <div className="mt-4 space-y-3">
-              {visibleEntries.length ? visibleEntries.map((entry) => {
-                const aiMeta = entry.author_role === "system" ? parseAiContent(entry.content) : null;
-                const entryComments = commentsByEntry.get(entry.id) ?? [];
-                const topLevelComments = entryComments.filter((comment) => !comment.parent_comment_id);
-                const repliesByParent = new Map<string, typeof entryComments>();
-                for (const comment of entryComments.filter((comment) => comment.parent_comment_id)) {
-                  const parent = comment.parent_comment_id ?? "";
-                  const replies = repliesByParent.get(parent) ?? [];
-                  replies.push(comment);
-                  repliesByParent.set(parent, replies);
-                }
-                const displayContent = aiMeta?.body ?? entry.content;
-                const showHighlight = sourceEntryId === entry.id && !aiMeta;
+              {entryGroups.length ? entryGroups.map((group, groupIndex) => {
+                const containsSource = group.entries.some((entry) => entry.id === sourceEntryId);
                 return (
-                  <div key={entry.id}>
-                    {currentDate !== dateLabel(entry.occurred_at) ? (
-                      <h2 className="mt-6 border-b border-stone-200 pb-1 text-sm font-semibold uppercase tracking-wide text-stone-600">
-                        {(currentDate = dateLabel(entry.occurred_at))}
-                      </h2>
-                    ) : null}
-                    <article
-                      className={`scroll-mt-24 rounded-md border p-4 shadow-sm ${entryTone(entry.author_role)} ${sourceEntryId === entry.id ? "ring-2 ring-amber-400" : ""}`}
-                      id={`entry-${entry.id}`}
-                    >
-                      <div className="flex flex-wrap items-center gap-2 text-sm text-stone-600">
-                        <span>{timeLabel(entry.occurred_at)}</span>
-                        <span className="rounded-full bg-stone-100 px-2.5 py-1 font-medium text-stone-800">{roleBadge(entry)}</span>
-                        <span>{entry.profiles?.display_name ?? (entry.author_role === "system" ? "System" : "Care team")}</span>
-                        {aiMeta ? <strong className="rounded-full bg-amber-100 px-2.5 py-1 text-xs text-amber-950">{aiMeta.provider ? `${aiMeta.provider} · ` : ""}{displayToken(aiMeta.reviewState)}</strong> : null}
-                        {!aiMeta && entry.author_role === "system" ? <strong className="rounded-full bg-amber-100 px-2.5 py-1 text-xs text-amber-950">Needs verification</strong> : null}
-                        <Link className="ml-auto rounded-md border border-stone-200 px-2.5 py-1 text-xs font-medium hover:bg-stone-50 focus:outline-none focus:ring-2 focus:ring-teal-600" href={`/patients/${id}/history?demo=${encodeURIComponent(demo)}&entry=${entry.id}`}>History</Link>
-                      </div>
-                      <div className="mt-3 text-sm leading-6 text-stone-800">
-                        {showHighlight ? (
-                          <EvidenceText content={entry.content} evidenceStart={sourceSpan?.char_start ?? null} evidenceEnd={sourceSpan?.char_end ?? null} />
-                        ) : (
-                          <p className="whitespace-pre-wrap">{preview(displayContent)}</p>
-                        )}
-                      </div>
-                      {aiMeta ? (
-                        <details className="mt-3 text-xs text-stone-600">
-                          <summary className="cursor-pointer font-medium text-stone-700">AI details</summary>
-                          <p className="mt-1">Provider: {aiMeta.provider ?? "Seeded demo system entry"}</p>
-                          <p>Verification: {displayToken(aiMeta.reviewState)}</p>
-                          <p>Runtime AI-scribe calls pass through PHI redaction before inference.</p>
-                        </details>
-                      ) : null}
-                      {entry.author_role === "staff" || entry.author_role === "clinician" ? <EntryEditor entry={entry} /> : null}
-                      <CommentComposer entryId={entry.id} users={assignableUsers} />
-                      {topLevelComments.length ? (
-                        <div className="mt-3 space-y-2">
-                          {topLevelComments.map((comment) => (
-                            <div className="rounded border border-stone-200 bg-white p-3 text-sm" key={comment.id}>
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="font-medium">{comment.profiles?.display_name ?? "Care team"}</span>
-                                <span className="text-stone-500">{dateTimeLabel(comment.created_at)}</span>
-                                <CommentResolveButton commentId={comment.id} resolved={Boolean(comment.resolved_at)} />
-                              </div>
-                              <p className="mt-1 text-stone-800">{comment.body}</p>
-                              {(repliesByParent.get(comment.id) ?? []).map((reply) => (
-                                <div className="mt-2 rounded border border-stone-100 bg-stone-50 p-2" key={reply.id}>
-                                  <div className="flex flex-wrap items-center gap-2 text-xs text-stone-500">
-                                    <span className="font-medium text-stone-700">{reply.profiles?.display_name ?? "Care team"}</span>
-                                    <span>{dateTimeLabel(reply.created_at)}</span>
-                                  </div>
-                                  <p className="mt-1">{reply.body}</p>
-                                </div>
-                              ))}
-                              <ReplyComposer entryId={entry.id} parentCommentId={comment.id} />
+                  <details className="rounded-md border border-stone-200 bg-white shadow-sm" key={group.label} open={groupIndex === 0 || containsSource}>
+                    <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-stone-800">
+                      <span>{group.label}</span>
+                      <span className="ml-auto mr-2 rounded-full bg-stone-100 px-2.5 py-1 text-xs font-medium text-stone-600">{group.entries.length} {group.entries.length === 1 ? "entry" : "entries"}</span>
+                    </summary>
+                    <div className="space-y-3 border-t border-stone-100 p-3">
+                      {group.entries.map((entry) => {
+                        const aiMeta = entry.author_role === "system" ? parseAiContent(entry.content) : null;
+                        const entryComments = commentsByEntry.get(entry.id) ?? [];
+                        const topLevelComments = entryComments.filter((comment) => !comment.parent_comment_id);
+                        const repliesByParent = new Map<string, typeof entryComments>();
+                        for (const comment of entryComments.filter((comment) => comment.parent_comment_id)) {
+                          const parent = comment.parent_comment_id ?? "";
+                          const replies = repliesByParent.get(parent) ?? [];
+                          replies.push(comment);
+                          repliesByParent.set(parent, replies);
+                        }
+                        const displayContent = aiMeta?.body ?? entry.content;
+                        const showHighlight = sourceEntryId === entry.id && !aiMeta;
+                        const transcriptSpan = aiMeta ? firstTranscriptSpan(entry) : null;
+                        const transcriptSource = transcriptSpan?.provenance_sources?.source_content ?? "";
+                        return (
+                          <article
+                            className={`scroll-mt-24 rounded-md border p-4 ${entryTone(entry.author_role)} ${sourceEntryId === entry.id ? "ring-2 ring-amber-400" : ""}`}
+                            id={`entry-${entry.id}`}
+                            key={entry.id}
+                          >
+                            <div className="flex flex-wrap items-center gap-2 text-sm text-stone-600">
+                              <span>{timeLabel(entry.occurred_at)}</span>
+                              <span className="rounded-full bg-stone-100 px-2.5 py-1 font-medium text-stone-800">{roleBadge(entry)}</span>
+                              <span>{entry.profiles?.display_name ?? (entry.author_role === "system" ? "System" : "Care team")}</span>
+                              {aiMeta ? <strong className="rounded-full bg-amber-100 px-2.5 py-1 text-xs text-amber-950">{aiMeta.provider ? `${aiMeta.provider} - ` : ""}{displayToken(aiMeta.reviewState)}</strong> : null}
+                              {!aiMeta && entry.author_role === "system" ? <strong className="rounded-full bg-amber-100 px-2.5 py-1 text-xs text-amber-950">Needs verification</strong> : null}
+                              <Link className="ml-auto rounded-md border border-stone-200 px-2.5 py-1 text-xs font-medium hover:bg-stone-50 focus:outline-none focus:ring-2 focus:ring-teal-600" href={`/patients/${id}/history?demo=${encodeURIComponent(demo)}&entry=${entry.id}`}>History</Link>
                             </div>
-                          ))}
-                        </div>
-                      ) : null}
-                    </article>
-                  </div>
+                            <div className="mt-3 text-sm leading-6 text-stone-800">
+                              {showHighlight ? (
+                                <EvidenceText content={entry.content} evidenceStart={sourceSpan?.char_start ?? null} evidenceEnd={sourceSpan?.char_end ?? null} />
+                              ) : (
+                                <p className="whitespace-pre-wrap">{preview(displayContent)}</p>
+                              )}
+                            </div>
+                            {aiMeta ? (
+                              <details className="mt-3 text-xs text-stone-600">
+                                <summary className="cursor-pointer font-medium text-stone-700">AI details</summary>
+                                <p className="mt-1">Provider: {aiMeta.provider ?? "Seeded demo system entry"}</p>
+                                <p>Verification: {displayToken(aiMeta.reviewState)}</p>
+                                {aiMeta.sourceLabel ? <p>Source: {aiMeta.sourceLabel}</p> : null}
+                                {aiMeta.sourceSessionIdentifier ? <p>Source session retained for audit/provenance.</p> : null}
+                                <p>Runtime AI-scribe calls pass through PHI redaction before inference.</p>
+                              </details>
+                            ) : null}
+                            {transcriptSpan ? (
+                              <details className={`mt-3 rounded border p-3 text-xs ${sourceEntryId === entry.id ? "border-amber-300 bg-amber-50" : "border-amber-200 bg-white/70"}`} open={sourceEntryId === entry.id}>
+                                <summary className="cursor-pointer font-semibold text-stone-800">Review source</summary>
+                                <p className="mt-2 text-stone-600">Source transcript. Highlighted text is exact source evidence; the generated summary remains needs verification.</p>
+                                <div className="mt-2 max-h-52 overflow-auto rounded border border-stone-200 bg-white p-3 text-sm leading-6 text-stone-800">
+                                  <EvidenceText content={transcriptSource} evidenceStart={transcriptSpan.char_start} evidenceEnd={transcriptSpan.char_end} />
+                                </div>
+                                {transcriptSpan.transcript_start_ms !== null && transcriptSpan.transcript_end_ms !== null ? (
+                                  <p className="mt-2 text-stone-600">Transcript segment: {transcriptSpan.transcript_start_ms}ms-{transcriptSpan.transcript_end_ms}ms</p>
+                                ) : null}
+                              </details>
+                            ) : null}
+                            {entry.author_role === "staff" || entry.author_role === "clinician" ? <EntryEditor entry={entry} /> : null}
+                            <CommentComposer entryId={entry.id} users={assignableUsers} />
+                            {topLevelComments.length ? (
+                              <div className="mt-3 space-y-2">
+                                {topLevelComments.map((comment) => (
+                                  <div className="rounded border border-stone-200 bg-white p-3 text-sm" key={comment.id}>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <span className="font-medium">{comment.profiles?.display_name ?? "Care team"}</span>
+                                      <span className="text-stone-500">{dateTimeLabel(comment.created_at)}</span>
+                                      <CommentResolveButton commentId={comment.id} resolved={Boolean(comment.resolved_at)} />
+                                    </div>
+                                    <p className="mt-1 text-stone-800">{comment.body}</p>
+                                    {(repliesByParent.get(comment.id) ?? []).map((reply) => (
+                                      <div className="mt-2 rounded border border-stone-100 bg-stone-50 p-2" key={reply.id}>
+                                        <div className="flex flex-wrap items-center gap-2 text-xs text-stone-500">
+                                          <span className="font-medium text-stone-700">{reply.profiles?.display_name ?? "Care team"}</span>
+                                          <span>{dateTimeLabel(reply.created_at)}</span>
+                                        </div>
+                                        <p className="mt-1">{reply.body}</p>
+                                      </div>
+                                    ))}
+                                    <ReplyComposer entryId={entry.id} parentCommentId={comment.id} />
+                                  </div>
+                                ))}
+                              </div>
+                            ) : null}
+                          </article>
+                        );
+                      })}
+                    </div>
+                  </details>
                 );
               }) : (
                 <p className="rounded-md border border-stone-200 bg-white p-4 text-stone-600">No timeline entries match this filter.</p>
@@ -420,15 +517,15 @@ export default async function PatientPage({
                           <div className="rounded border border-white bg-white/80 p-2">
                             <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Earlier evidence</p>
                             <p className="mt-1">{factSummary(factA)}</p>
-                            <p className="text-xs text-stone-600">{entryA ? `${dateLabel(entryA.occurred_at)} · ${roleBadge(entryA)}` : "Source entry retained in provenance"}</p>
-                            {entryA ? <Link className="mt-1 inline-flex text-xs font-medium text-teal-800 hover:underline" href={`/patients/${id}?demo=${encodeURIComponent(demo)}&source=${entryA.id}#entry-${entryA.id}`}>View source →</Link> : null}
+                            <p className="text-xs text-stone-600">{entryA ? `${dateLabel(entryA.occurred_at)} - ${roleBadge(entryA)}` : "Source entry retained in provenance"}</p>
+                            {entryA ? <Link className="mt-1 inline-flex text-xs font-medium text-teal-800 hover:underline" href={`/patients/${id}?demo=${encodeURIComponent(demo)}&source=${entryA.id}#entry-${entryA.id}`}>View source -&gt;</Link> : null}
                           </div>
                           <div className="text-center text-xs font-semibold text-stone-500">VS</div>
                           <div className="rounded border border-white bg-white/80 p-2">
                             <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Later evidence</p>
                             <p className="mt-1">{factSummary(factB)}</p>
-                            <p className="text-xs text-stone-600">{entryB ? `${dateLabel(entryB.occurred_at)} · ${roleBadge(entryB)}` : "Source entry retained in provenance"}</p>
-                            {entryB ? <Link className="mt-1 inline-flex text-xs font-medium text-teal-800 hover:underline" href={`/patients/${id}?demo=${encodeURIComponent(demo)}&source=${entryB.id}#entry-${entryB.id}`}>View source →</Link> : null}
+                            <p className="text-xs text-stone-600">{entryB ? `${dateLabel(entryB.occurred_at)} - ${roleBadge(entryB)}` : "Source entry retained in provenance"}</p>
+                            {entryB ? <Link className="mt-1 inline-flex text-xs font-medium text-teal-800 hover:underline" href={`/patients/${id}?demo=${encodeURIComponent(demo)}&source=${entryB.id}#entry-${entryB.id}`}>View source -&gt;</Link> : null}
                           </div>
                         </div>
                         <dl className="mt-3 space-y-1 text-xs text-stone-700">
@@ -436,11 +533,11 @@ export default async function PatientPage({
                             <dt className="font-semibold">Why flagged</dt>
                             <dd>These source facts disagree and require clinician review.</dd>
                           </div>
-                          <div>
-                            <dt className="font-semibold">Deterministic rule</dt>
-                            <dd>{conflict.conflict_type}</dd>
-                          </div>
                         </dl>
+                        <details className="mt-2 rounded border border-red-100 bg-white/60 p-2 text-xs text-stone-600">
+                          <summary className="cursor-pointer font-medium text-stone-700">Technical details</summary>
+                          <p className="mt-1">Deterministic rule: {displayToken(conflict.conflict_type)}</p>
+                        </details>
                       </div>
                     );
                   })}
@@ -452,16 +549,16 @@ export default async function PatientPage({
 
             <section className="rounded-md border border-stone-200 bg-white p-4 shadow-sm">
               <h2 className="text-lg font-semibold">Patient-facing review</h2>
-              {result.patientFacingContent.length ? (
+              {visiblePatientFacingContent.length ? (
                 <div className="mt-3 space-y-2">
-                  {result.patientFacingContent.map((item) => (
+                  {visiblePatientFacingContent.map((item) => (
                     <div className="rounded border border-stone-200 p-3 text-sm" key={item.id}>
                       <div className="flex items-start justify-between gap-2">
-                        <strong>{item.title}</strong>
+                        <strong>{cleanDemoTitle(item.title)}</strong>
                         <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs">{displayToken(item.status)}</span>
                       </div>
                       <p className="mt-1 text-stone-700">{preview(item.body)}</p>
-                      <p className="mt-2 text-xs text-stone-600">Evidence quality {Number(item.evidence_confidence).toFixed(2)} · {displayToken(item.review_status)}</p>
+                      <p className="mt-2 text-xs text-stone-600">Evidence quality {Number(item.evidence_confidence).toFixed(2)} - {displayToken(item.review_status)}</p>
                       <PatientContentStatusButtons contentId={item.id} status={item.status} />
                     </div>
                   ))}
@@ -472,6 +569,7 @@ export default async function PatientPage({
             </section>
 
             <NoteComposer patientId={id} />
+            <AiScribeComposer patientId={id} actorRole={actor?.role} />
             <TaskComposer patientId={id} users={assignableUsers} />
             <section className="rounded-md border border-stone-200 bg-white p-4 shadow-sm">
               <h2 className="text-lg font-semibold">Follow-up tasks</h2>

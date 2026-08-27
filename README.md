@@ -26,6 +26,8 @@ Jane Tan is the golden demo patient in Clinic A:
 - Aug 2026: repeat renal panel discussed but not ordered
 - medication/dose conflict, approved patient-facing content, HOT/WARM/COLD ranking, adaptive importance, and optional synthetic voice capture
 
+The historical AI Scribe rows above are seeded synthetic fixtures for longitudinal context. To demonstrate live generation, open Jane as the clinician demo actor, expand `+ AI Scribe`, paste a synthetic transcript, and click `Generate AI Summary`. That user-triggered flow calls Gemini when `GEMINI_API_KEY` is configured, persists a new unverified internal AI entry, and links it to the original synthetic transcript source.
+
 Role switching is demo navigation only. Security is enforced server-side and by PostgreSQL Row Level Security.
 
 ## Architecture
@@ -104,7 +106,7 @@ Clinical edits use optimistic concurrency. Writes include `expected_version`; st
 
 ## Trust Model
 
-AI-scribed entries are `author_role = system` and remain visually distinct from human notes. Structured extraction is preferred over generation for clinical facts. Candidates require exact evidence text, character offsets, source entry/version, and provenance resolution before becoming trusted.
+AI-scribed entries are `author_role = system` and remain visually distinct from human notes. Runtime AI Scribe entries start as unverified internal content and retain provider/model metadata plus transcript source provenance. Structured extraction is preferred over generation for clinical facts. Candidates require exact evidence text, character offsets, source entry/version or transcript source, and provenance resolution before becoming trusted.
 
 Provenance spans resolve to source entry, version, evidence offsets, evidence text, and transcript timestamps where applicable. If offsets are invalid, evidence text does not match, source is missing, or evidence is ambiguous, the system abstains and marks the item `needs_review`.
 

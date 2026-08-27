@@ -56,7 +56,14 @@ export default async function HistoryPage({
   return (
     <AppShell demo={demo} patientId={id} clinicName={actor?.clinicName}>
     <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
-      <Link className="text-sm font-medium text-teal-800 hover:underline" href={`/patients/${id}?demo=${encodeURIComponent(demo)}`}>Back to CareNote</Link>
+      <nav className="flex flex-wrap items-center gap-2 text-sm text-stone-600" aria-label="Breadcrumb">
+        <Link className="font-medium text-teal-800 hover:underline focus:outline-none focus:ring-2 focus:ring-teal-600" href={`/patients?demo=${encodeURIComponent(demo)}`}>Patients</Link>
+        <span>/</span>
+        <Link className="font-medium text-teal-800 hover:underline focus:outline-none focus:ring-2 focus:ring-teal-600" href={`/patients/${id}?demo=${encodeURIComponent(demo)}`}>CareNote</Link>
+        <span>/</span>
+        <span className="font-medium text-stone-900">Revision history</span>
+      </nav>
+      <Link className="mt-3 inline-flex text-sm font-medium text-teal-800 hover:underline" href={`/patients/${id}?demo=${encodeURIComponent(demo)}`}>← Back to CareNote</Link>
       <header className="mt-4 rounded-md border border-stone-200 bg-white p-5 shadow-sm">
         <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Revision history</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">{displayToken(entry.entry_type)}</h1>

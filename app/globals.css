@@ -24,7 +24,29 @@ a {
 }
 
 summary {
-  list-style-position: outside;
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+  list-style: none;
+}
+
+summary::-webkit-details-marker {
+  display: none;
+}
+
+summary::after {
+  color: #0f766e;
+  content: "›";
+  flex: 0 0 auto;
+  font-size: 1rem;
+  line-height: 1;
+  transform: rotate(0deg);
+  transition: transform 120ms ease;
+}
+
+details[open] > summary::after {
+  transform: rotate(90deg);
 }
 
 mark {

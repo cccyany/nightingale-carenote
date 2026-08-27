@@ -23,7 +23,7 @@ const patterns: Array<{ class: RedactionClass; regex: RegExp }> = [
   { class: "structured_id", regex: /\b(?:MRN|ID|IC|FIN)(?=[:#\s-])[:#\s-]*[A-Z0-9-]{5,}\b/gi },
   { class: "name", regex: /\b(?:Jane Tan|Alex Lim|Sam Lee|Mina Koh|Avery Ong|Bo Chen)\b/g }
 ];
-const unresolvedNamePattern = /\b(?!(?:No known|Repeat renal)\b)[A-Z][a-z]+ [A-Z][a-z]+\b/;
+const unresolvedNamePattern = /\b(?!(?:No known|Repeat renal|Patient reports|Patient denies|Clinician discussed|Doctor discussed|Nurse notes|Staff notes)\b)[A-Z][a-z]+ [A-Z][a-z]+\b/;
 
 export function redactForLlm(rawText: string): RedactionResult {
   const matches: RedactionReplacement[] = [];

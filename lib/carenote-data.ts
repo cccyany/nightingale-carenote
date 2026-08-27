@@ -1,6 +1,6 @@
 import { createSupabaseActorClient } from "@/lib/supabase/request";
+import { applyTimelineEntryFilter, type TimelineFilter } from "./timeline-filters";
 
-export type TimelineFilter = "all" | "ai" | "clinician" | "staff" | "patient" | "system";
 type RelationObject = Record<string, unknown> | null;
 export type DisplayProfile = { display_name: string } | null;
 export type DisplayClinic = { name: string } | null;
@@ -25,6 +25,20 @@ export type CareNoteEntry = {
   created_at: string;
   updated_at: string;
   profiles: DisplayProfile;
+  provenance_spans?: Array<{
+    id: string;
+    char_start: number | null;
+    char_end: number | null;
+    evidence_text: string;
+    transcript_start_ms: number | null;
+    transcript_end_ms: number | null;
+    provenance_sources: {
+      source_kind: string;
+      source_label: string;
+      source_content: string | null;
+      source_session_identifier: string | null;
+    } | null;
+  }> | null;
 };
 export type CareNoteComment = {
   id: string;
@@ -170,17 +184,9 @@ const entrySelect = `
   occurred_at,
   created_at,
   updated_at,
-  profiles:author_id(display_name)
+  profiles:author_id(display_name),
+  provenance_spans(id, char_start, char_end, evidence_text, transcript_start_ms, transcript_end_ms, provenance_sources:source_id(source_kind, source_label, source_content, source_session_identifier))
 `;
-
-export function filterForRole(role: string): TimelineFilter {
-  if (role === "ai") return "ai";
-  if (role === "clinician") return "clinician";
-  if (role === "staff") return "staff";
-  if (role === "patient") return "patient";
-  if (role === "system") return "system";
-  return "all";
-}
 
 async function careReadClient(actorToken?: string) {
   if (actorToken) return createSupabaseActorClient(actorToken);
@@ -212,11 +218,7 @@ export async function getPatientCareNote(patientId: string, filter: TimelineFilt
     .eq("patient_id", patientId)
     .order("occurred_at", { ascending: false });
 
-  if (filter === "ai") {
-    query = query.like("entry_type", "ai_%");
-  } else if (filter !== "all") {
-    query = query.eq("author_role", filter);
-  }
+  query = applyTimelineEntryFilter(query, filter);
 
   const [
     { data: entries, error: entriesError },

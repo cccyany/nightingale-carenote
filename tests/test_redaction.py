@@ -9,7 +9,9 @@ PHI_PATTERNS = {
     "name": re.compile(r"\b(?:Jane Tan|Alex Lim|Sam Lee|Mina Koh|Avery Ong|Bo Chen)\b", re.I),
 }
 
-UNRESOLVED_NAME_PATTERN = re.compile(r"\b(?!(?:No known|Repeat renal)\b)[A-Z][a-z]+ [A-Z][a-z]+\b")
+UNRESOLVED_NAME_PATTERN = re.compile(
+    r"\b(?!(?:No known|Repeat renal|Patient reports|Patient denies|Clinician discussed|Doctor discussed|Nurse notes|Staff notes)\b)[A-Z][a-z]+ [A-Z][a-z]+\b"
+)
 
 
 class MockProvider:

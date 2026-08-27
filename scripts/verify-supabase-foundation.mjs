@@ -75,6 +75,7 @@ try {
       "deterministic_risk_floor",
       "seed_jane_trust_glance",
       "create_provenance_for_entry_span",
+      "create_provenance_for_transcript_span",
       "upsert_fact_from_span",
       "detect_fact_conflicts_for_patient",
       "ingest_ai_scribed_note",

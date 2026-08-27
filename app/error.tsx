@@ -7,7 +7,7 @@ export default function Error({ reset }: { error: Error & { digest?: string }; r
         <p className="text-sm font-semibold uppercase tracking-wide text-red-700">CareNote unavailable</p>
         <h1 className="mt-2 text-2xl font-semibold">We could not load this view.</h1>
         <p className="mt-2 text-stone-700">Access may be restricted, or the Supabase project may be unavailable.</p>
-        <button className="mt-4 rounded-md bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-stone-700 focus:outline-none focus:ring-2 focus:ring-teal-600" onClick={reset} type="button">
+        <button className="mt-4 rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800 focus:outline-none focus:ring-2 focus:ring-teal-600 disabled:cursor-not-allowed disabled:bg-teal-200 disabled:text-teal-950" onClick={reset} type="button">
           Try again
         </button>
       </section>
