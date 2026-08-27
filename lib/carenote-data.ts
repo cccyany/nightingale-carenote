@@ -84,6 +84,9 @@ export type ClinicalFact = {
   evidence_confidence: number;
   review_status: string;
   provenance_span_id: string;
+  provenance_spans: {
+    entry_id: string | null;
+  } | null;
 };
 export type FactConflict = {
   id: string;
@@ -134,6 +137,26 @@ function normalizeRelations<T extends Record<string, unknown>>(row: T): T {
   };
 }
 
+function logSupabaseError(context: string, error: unknown) {
+  const supabaseError = error as {
+    code?: string;
+    message?: string;
+    details?: string;
+    hint?: string;
+  };
+  console.error("[supabase]", context, {
+    code: supabaseError.code ?? null,
+    message: supabaseError.message ?? String(error),
+    details: supabaseError.details ?? null,
+    hint: supabaseError.hint ?? null
+  });
+}
+
+function throwSupabaseError(context: string, error: unknown): never {
+  logSupabaseError(context, error);
+  throw error;
+}
+
 const entrySelect = `
   id,
   clinic_id,
@@ -181,9 +204,7 @@ export async function getPatientCareNote(patientId: string, filter: TimelineFilt
     .eq("id", patientId)
     .single();
 
-  if (patientError) {
-    throw patientError;
-  }
+  if (patientError) throwSupabaseError("getPatientCareNote.patient", patientError);
 
   let query = supabase
     .from("care_entries")
@@ -227,10 +248,10 @@ export async function getPatientCareNote(patientId: string, filter: TimelineFilt
         .limit(5),
       supabase
         .from("clinical_facts")
-        .select("id, entity_type, normalized_entity, value, unit, assertion, authority_role, evidence_confidence, review_status, provenance_span_id")
+        .select("id, entity_type, normalized_entity, value, unit, assertion, authority_role, evidence_confidence, review_status, provenance_span_id, provenance_spans:provenance_span_id(entry_id)")
         .eq("patient_id", patientId)
         .order("created_at", { ascending: false })
-        .limit(12),
+        .limit(100),
       supabase
         .from("fact_conflicts")
         .select("id, conflict_type, status, fact_a_id, fact_b_id, created_at")
@@ -245,13 +266,13 @@ export async function getPatientCareNote(patientId: string, filter: TimelineFilt
         .limit(8)
     ]);
 
-  if (entriesError) throw entriesError;
-  if (commentsError) throw commentsError;
-  if (tasksError) throw tasksError;
-  if (glanceError) throw glanceError;
-  if (factsError) throw factsError;
-  if (conflictsError) throw conflictsError;
-  if (patientContentError) throw patientContentError;
+  if (entriesError) throwSupabaseError("getPatientCareNote.entries", entriesError);
+  if (commentsError) throwSupabaseError("getPatientCareNote.comments", commentsError);
+  if (tasksError) throwSupabaseError("getPatientCareNote.tasks", tasksError);
+  if (glanceError) throwSupabaseError("getPatientCareNote.glanceItems", glanceError);
+  if (factsError) throwSupabaseError("getPatientCareNote.clinicalFacts", factsError);
+  if (conflictsError) throwSupabaseError("getPatientCareNote.factConflicts", conflictsError);
+  if (patientContentError) throwSupabaseError("getPatientCareNote.patientFacingContent", patientContentError);
 
   return {
     patient: normalizeRelations(patient) as unknown as CareNotePatient,
@@ -259,7 +280,7 @@ export async function getPatientCareNote(patientId: string, filter: TimelineFilt
     comments: (comments ?? []).map((comment) => normalizeRelations(comment) as unknown as CareNoteComment),
     tasks: (tasks ?? []).map((task) => normalizeRelations(task) as unknown as CareNoteTask),
     glanceItems: (glanceItems ?? []).map((item) => normalizeRelations(item) as unknown as GlanceItem),
-    clinicalFacts: (clinicalFacts ?? []) as ClinicalFact[],
+    clinicalFacts: (clinicalFacts ?? []).map((fact) => normalizeRelations(fact) as unknown as ClinicalFact),
     factConflicts: (factConflicts ?? []) as FactConflict[],
     patientFacingContent: (patientFacingContent ?? []) as PatientFacingContent[]
   };
@@ -279,8 +300,8 @@ export async function getEntryHistory(entryId: string, actorToken?: string): Pro
       .order("version_number", { ascending: false })
   ]);
 
-  if (entryError) throw entryError;
-  if (versionsError) throw versionsError;
+  if (entryError) throwSupabaseError("getEntryHistory.entry", entryError);
+  if (versionsError) throwSupabaseError("getEntryHistory.versions", versionsError);
 
   return {
     entry: normalizeRelations(entry) as unknown as CareNoteEntry,
@@ -297,6 +318,6 @@ export async function getClinicAssignableUsers(clinicId: string, actorToken?: st
     .in("role", ["staff", "clinician", "admin"])
     .order("role", { ascending: true });
 
-  if (error) throw error;
+  if (error) throwSupabaseError("getClinicAssignableUsers.memberships", error);
   return (data ?? []).map((membership) => normalizeRelations(membership) as unknown as AssignableUser);
 }

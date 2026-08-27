@@ -27,6 +27,14 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     return NextResponse.json({ status: "needs_review", redaction: gateway.auditMetadata }, { status: 422 });
   }
 
+  const persistedContent = JSON.stringify({
+    provider: gateway.response.provider,
+    provider_display: gateway.response.providerDisplayName,
+    model: gateway.response.model ?? null,
+    review_state: "unverified",
+    generated: gateway.response.text
+  });
+
   const supabase = await createSupabaseActorClient(token);
   const { data: session, error: transcriptError } = await supabase.rpc("create_transcript_session", {
     p_patient_id: id,
@@ -38,14 +46,14 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
   const { data: entryId, error: entryError } = await supabase.rpc("ingest_ai_scribed_note", {
     p_patient_id: id,
     p_entry_type: body.data.entryType,
-    p_content: gateway.response.text,
+    p_content: persistedContent,
     p_source_label: body.data.sourceLabel,
     p_session_identifier: session.id
   });
   if (entryError) return jsonError(403, entryError.message);
 
   const firstSegment = segments[0];
-  const evidence = gateway.response.text.slice(0, Math.min(32, gateway.response.text.length)) || "structured_extraction_ready";
+  const evidence = persistedContent.slice(0, Math.min(32, persistedContent.length)) || "structured_extraction_ready";
   const { data: spanId, error: spanError } = await supabase.rpc("create_provenance_for_entry_span", {
     p_entry_id: entryId,
     p_evidence_text: evidence,
@@ -62,6 +70,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     transcriptSessionId: session.id,
     entryId,
     provenanceSpanId: spanId,
+    provider: gateway.response.providerDisplayName,
+    model: gateway.response.model ?? null,
     redaction: gateway.auditMetadata,
     uncertainSegments: segments.filter((segment) => segment.uncertain).length
   }, { status: 201 });

@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Nightingale CareNote",
-  description: "Synthetic longitudinal care-note workspace"
+  description: "Know what matters. Know why. Know where it came from."
 };
 
 export default function RootLayout({

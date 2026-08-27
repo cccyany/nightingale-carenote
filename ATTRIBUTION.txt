@@ -100,10 +100,15 @@ Python test tooling
 Models, transcription, assets, and fonts
 ----------------------------------------
 
-- AI provider abstraction
-  Purpose: safe gateway interface for optional LLM use.
-  Provider actually required for tests/demo: deterministic/mock provider implemented in repository code.
-  License/terms: no external model service is required for the committed demo path. Any configured real provider terms require manual verification before use.
+- Google Gemini API / Gemini 3.5 Flash
+  Purpose: optional real LLM provider for server-side synthetic AI-scribe generation behind the PHI redaction gateway.
+  Model ID used by default: gemini-3.5-flash.
+  Terms/license: Google hosted service/API terms require manual verification against the current Google AI for Developers terms before external distribution or production use; the service is not an open-source library.
+  Source: https://ai.google.dev/gemini-api/docs/models and https://ai.google.dev/gemini-api/docs/generate-content
+
+- Deterministic AI mock provider
+  Purpose: local/test fallback for safe gateway and demo flows when GEMINI_API_KEY is absent.
+  License/terms: repository code; no external service required.
 
 - Transcription provider abstraction
   Purpose: synthetic ambient voice capture path.

@@ -27,15 +27,28 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     );
   }
 
+  const persistedContent = JSON.stringify({
+    provider: gateway.response.provider,
+    provider_display: gateway.response.providerDisplayName,
+    model: gateway.response.model ?? null,
+    review_state: "unverified",
+    generated: gateway.response.text
+  });
+
   const supabase = await createSupabaseActorClient(token);
   const { data, error } = await supabase.rpc("ingest_ai_scribed_note", {
     p_patient_id: id,
     p_entry_type: body.data.entryType,
-    p_content: gateway.response.text,
+    p_content: persistedContent,
     p_source_label: body.data.sourceLabel,
     p_session_identifier: body.data.sessionIdentifier ?? null
   });
 
   if (error) return jsonError(403, error.message);
-  return NextResponse.json({ entryId: data, redaction: gateway.auditMetadata }, { status: 201 });
+  return NextResponse.json({
+    entryId: data,
+    provider: gateway.response.providerDisplayName,
+    model: gateway.response.model ?? null,
+    redaction: gateway.auditMetadata
+  }, { status: 201 });
 }

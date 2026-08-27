@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AppShell } from "@/components/AppShell";
 import { createSupabaseActorClient } from "@/lib/supabase/request";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +17,12 @@ function displayToken(value: string) {
   return value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function patientSafeTitle(title: string) {
+  if (title.startsWith("Synthetic patient approval")) return "Approved care instruction";
+  if (title.startsWith("Synthetic approved summary")) return "Approved care summary";
+  return title;
+}
+
 export default async function PatientMePage({
   searchParams
 }: {
@@ -24,13 +31,15 @@ export default async function PatientMePage({
   const demo = (await searchParams)?.demo;
   if (!demo || demo !== "demo-patient") {
     return (
-      <main className="mx-auto min-h-screen max-w-4xl px-4 py-8 sm:px-6">
-        <section className="rounded-md border border-stone-300 bg-white p-5">
+      <AppShell patientView>
+        <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
+        <section className="rounded-md border border-stone-200 bg-white p-5 shadow-sm">
           <h1 className="text-3xl font-semibold">Choose a demo role</h1>
           <p className="mt-2 text-stone-700">Patient content is loaded through a patient-authenticated Supabase session.</p>
-          <Link className="mt-4 inline-block rounded-md bg-teal-700 px-4 py-2 text-white" href="/login">Demo roles</Link>
+          <Link className="mt-4 inline-block rounded-md bg-teal-700 px-4 py-2 text-white" href="/login">View demo roles</Link>
         </section>
       </main>
+      </AppShell>
     );
   }
 
@@ -55,24 +64,25 @@ export default async function PatientMePage({
   const visibleEntries = (entries ?? []).filter((entry) => !String(entry.entry_type).startsWith("ai_"));
 
   return (
-    <main className="mx-auto min-h-screen max-w-4xl px-4 py-8 sm:px-6">
-      <header className="rounded-md border border-teal-700 bg-white p-5">
-        <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Patient-safe CareNote</p>
-        <h1 className="mt-2 text-3xl font-semibold">My CareNote</h1>
+    <AppShell demo={demo} clinicName="Clinic A" patientName="Jane Tan" patientView>
+      <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
+      <header className="rounded-md border border-teal-700 bg-white p-5 shadow-sm">
+        <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Patient-safe view</p>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight">My CareNote</h1>
         <p className="mt-2 max-w-2xl text-stone-700">
-          This view only shows information approved for the patient, plus patient-submitted items intended for sharing.
+          Information your care team has approved for you.
         </p>
       </header>
 
       {(approvedContent ?? []).length ? (
         <section className="mt-5">
-          <h2 className="text-xl font-semibold">Approved summaries and instructions</h2>
+          <h2 className="text-xl font-semibold">From your care team</h2>
           <div className="mt-3 space-y-3">
             {(approvedContent ?? []).map((item) => (
-              <article className="rounded-md border border-teal-300 bg-white p-4" key={item.id}>
-                <p className="text-sm text-stone-600">Approved {dateTimeLabel(item.approved_at ?? item.created_at)}</p>
-                <h3 className="mt-1 font-semibold">{item.title}</h3>
-                <p className="mt-2">{item.body}</p>
+              <article className="rounded-md border border-teal-200 bg-white p-4 shadow-sm" key={item.id}>
+                <p className="text-sm font-medium text-teal-800">Approved {dateTimeLabel(item.approved_at ?? item.created_at)}</p>
+                <h3 className="mt-1 font-semibold">{patientSafeTitle(item.title)}</h3>
+                <p className="mt-2 leading-6 text-stone-800">{item.body}</p>
               </article>
             ))}
           </div>
@@ -81,12 +91,12 @@ export default async function PatientMePage({
 
       {visibleEntries.length ? (
         <section className="mt-5">
-          <h2 className="text-xl font-semibold">Shared by me</h2>
+          <h2 className="text-xl font-semibold">Shared by you</h2>
           <div className="mt-3 space-y-3">
             {visibleEntries.map((entry) => (
-              <article className="rounded-md border border-stone-300 bg-white p-4" key={entry.id}>
-                <p className="text-sm text-stone-600">{dateTimeLabel(entry.occurred_at)} / {displayToken(entry.entry_type)}</p>
-                <p className="mt-2">{entry.content}</p>
+              <article className="rounded-md border border-stone-200 bg-white p-4 shadow-sm" key={entry.id}>
+                <p className="text-sm text-stone-600">{dateTimeLabel(entry.occurred_at)} · {displayToken(entry.entry_type)}</p>
+                <p className="mt-2 leading-6 text-stone-800">{entry.content}</p>
               </article>
             ))}
           </div>
@@ -97,5 +107,6 @@ export default async function PatientMePage({
         </p>
       )}
     </main>
+    </AppShell>
   );
 }

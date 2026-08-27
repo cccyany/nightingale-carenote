@@ -1,0 +1,34 @@
+
+> nightingale-carenote@0.1.0 dev
+> next dev --hostname 127.0.0.1 --port 3000
+
+   ▲ Next.js 15.5.24
+   - Local:        http://127.0.0.1:3000
+   - Network:      http://127.0.0.1:3000
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 3.9s
+ ○ Compiling / ...
+ ✓ Compiled / in 3s (610 modules)
+ GET / 200 in 3685ms
+ ○ Compiling /login ...
+ ✓ Compiled /login in 1192ms (613 modules)
+ GET /login 200 in 1935ms
+ ○ Compiling /patients ...
+ ✓ Compiled /patients in 880ms (651 modules)
+ GET /patients?demo=demo-clinician 200 in 3178ms
+ ○ Compiling /patients/[id] ...
+ ✓ Compiled /patients/[id] in 1110ms (662 modules)
+ GET /patients/30000000-0000-0000-0000-000000000001?demo=demo-clinician 200 in 5773ms
+ ○ Compiling /patients/[id]/history ...
+ ✓ Compiled /patients/[id]/history in 716ms (667 modules)
+ GET /patients/30000000-0000-0000-0000-000000000001/history?demo=demo-clinician&entry=40000000-0000-0000-0000-000000000004 200 in 3650ms
+ ✓ Compiled /patient/me in 469ms (669 modules)
+ GET /patient/me?demo=demo-patient 200 in 1552ms
+ GET / 200 in 157ms
+ GET /login 200 in 119ms
+ GET /patients?demo=demo-clinician 200 in 960ms
+ GET /patients/30000000-0000-0000-0000-000000000001?demo=demo-clinician 200 in 2181ms
+ GET /patients/30000000-0000-0000-0000-000000000001/history?demo=demo-clinician&entry=40000000-0000-0000-0000-000000000004 200 in 596ms
+ GET /patient/me?demo=demo-patient 200 in 559ms

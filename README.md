@@ -41,7 +41,7 @@ flowchart LR
   DB --> Trust[Provenance + facts + conflicts]
   DB --> Glance[Persisted ranked Glance items]
   Raw[Patient-derived text] --> Redact[PHI redaction gate]
-  Redact --> Provider[Mock or configured AI provider]
+  Redact --> Provider[Gemini 3.5 Flash or deterministic mock]
   Provider --> Extract[Structured candidates]
   Extract --> Trust
 ```
@@ -67,7 +67,9 @@ Required environment variables:
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `SUPABASE_DB_URL` using the Supabase Session Pooler connection string
-- optional AI provider variables if a real provider is configured; the app works with deterministic/mock providers without a paid key
+- `GEMINI_API_KEY` to enable real Gemini generation on server-side AI-scribe flows
+- `GEMINI_MODEL`, default `gemini-3.5-flash`
+- optional legacy `LLM_PROVIDER_ENDPOINT` / `LLM_PROVIDER_API_KEY`; the app works with deterministic/mock providers without a paid key
 
 ## Validation Commands
 
@@ -81,6 +83,7 @@ pytest
 npm.cmd run build
 npm.cmd run evaluate:fixtures
 npm.cmd run benchmark:glance
+npm.cmd run verify:gemini
 ```
 
 ## Security Model
@@ -137,7 +140,11 @@ Every LLM call goes through the centralized safe AI gateway:
 
 The current redactor detects synthetic names, Singapore NRIC/FIN-like identifiers, phone numbers, email addresses, and obvious structured identifiers. Metadata reports classes/counts without exposing original values. If verification cannot establish a safe payload, the request is blocked and marked for review.
 
-The provider abstraction supports deterministic/mock providers for tests/demo fallback and optional configured real providers. No secrets are committed.
+The provider abstraction supports a real Google Gemini adapter and deterministic/mock providers. If `GEMINI_API_KEY` is configured, server-side AI-scribe and synthetic voice-capture flows use Gemini with `GEMINI_MODEL` defaulting to the documented `gemini-3.5-flash` model. If no Gemini key is configured, the deterministic mock provider remains the default/fallback for tests, offline development, and demos without paid credentials.
+
+The Gemini provider receives redacted text only through `invokeSafeLlm()`. It asks for concise structured JSON for downstream validation, but deterministic extraction, provenance validation, clinical conflict detection, risk floors, importance ranking, and patient-facing approval remain separate from LLM generation. Malformed, empty, or provider-error responses fail into `needs_review` rather than becoming trusted clinical content.
+
+`npm.cmd run verify:gemini` performs a synthetic smoke test when `GEMINI_API_KEY` is present. It uses synthetic PHI, reports only redaction metadata and provider identity, and does not print the original synthetic values or API key.
 
 ## Ambient Voice
 
@@ -189,5 +196,5 @@ These are prototype evaluation evidence on small synthetic fixtures, not clinica
 - Physical archival/compression is deferred; HOT/WARM/COLD currently affects classification and ranking only.
 - Collaboration uses section/entry optimistic concurrency rather than CRDTs.
 - Revision history stores full snapshots rather than complex semantic diff objects.
-- AI and transcription providers are abstracted; deterministic mock providers keep the demo working without paid credentials.
+- AI and transcription providers are abstracted; Gemini can be enabled with a server-only key, and deterministic mock providers keep tests/offline demos working without paid credentials.
 - Ambient voice capture is synthetic and not validated for real clinical audio.

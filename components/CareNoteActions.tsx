@@ -51,9 +51,9 @@ export function NoteComposer({ patientId }: { patientId: string }) {
   }
 
   return (
-    <details className="rounded-md border border-stone-300 bg-white p-4">
-      <summary className="cursor-pointer text-lg font-semibold">Add care-team note</summary>
-      <p className="mt-2 text-sm text-stone-600">Demo navigation only. The server decides which role can write.</p>
+    <details className="rounded-md border border-stone-200 bg-white p-4 shadow-sm">
+      <summary className="cursor-pointer text-base font-semibold">+ Add care-team note</summary>
+      <p className="mt-2 text-sm text-stone-600">Demo author choice; server authorization and RLS enforce writes.</p>
       <div className="mt-3 flex flex-wrap gap-2">
         {demoTokens.slice(0, 2).map(([value, label]) => (
           <button
@@ -66,8 +66,8 @@ export function NoteComposer({ patientId }: { patientId: string }) {
           </button>
         ))}
       </div>
-      <textarea className="mt-3 min-h-24 w-full rounded-md border border-stone-300 p-3" onChange={(event) => setContent(event.target.value)} placeholder="Synthetic note text" value={content} />
-      <button className="mt-3 rounded-md bg-teal-700 px-4 py-2 text-white" disabled={!content.trim()} onClick={submit} type="button">Save note</button>
+      <textarea className="mt-3 min-h-24 w-full rounded-md border border-stone-300 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600" onChange={(event) => setContent(event.target.value)} placeholder="Synthetic care-team note" value={content} />
+      <button className="mt-3 rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50" disabled={!content.trim()} onClick={submit} type="button">Save note</button>
       {message ? <p className="mt-2 text-sm text-stone-700">{message}</p> : null}
     </details>
   );
@@ -106,8 +106,8 @@ export function EntryEditor({ entry }: { entry: Entry }) {
           {demoTokens.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
       </div>
-      <textarea className="mt-2 min-h-20 w-full rounded border border-stone-300 p-2 text-sm" onChange={(event) => setContent(event.target.value)} placeholder="Replacement content" value={content} />
-      <button className="mt-2 rounded bg-stone-800 px-3 py-1 text-sm text-white" disabled={!content.trim()} onClick={submit} type="button">
+      <textarea className="mt-2 min-h-20 w-full rounded border border-stone-300 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600" onChange={(event) => setContent(event.target.value)} placeholder="Updated note text" value={content} />
+      <button className="mt-2 rounded bg-stone-800 px-3 py-1.5 text-sm text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={!content.trim()} onClick={submit} type="button">
         Save edit
       </button>
       {message ? <p className="mt-2 text-sm text-stone-700">{message}</p> : null}
@@ -141,15 +141,39 @@ export function CommentComposer({ entryId, users }: { entryId: string; users: As
   }
 
   return (
-    <details className="mt-3 rounded-md border border-stone-200 p-3">
+    <details className="mt-3 rounded-md border border-stone-200 bg-white/70 p-3">
       <summary className="cursor-pointer text-sm font-semibold">Comment</summary>
       <select className="mt-2 w-full rounded border border-stone-300 p-2 text-sm" onChange={(event) => setMention(event.target.value)} value={mention}>
         <option value="">No mention</option>
         {users.map((user) => <option key={user.profile_id} value={user.profile_id}>@{user.profiles?.display_name ?? user.profile_id} ({user.role})</option>)}
       </select>
-      <textarea className="mt-2 min-h-16 w-full rounded border border-stone-300 p-2 text-sm" onChange={(event) => setBody(event.target.value)} placeholder="Internal collaboration comment" value={body} />
-      <button className="mt-2 rounded bg-stone-800 px-3 py-1 text-sm text-white" disabled={!body.trim()} onClick={submit} type="button">Post</button>
+      <textarea className="mt-2 min-h-16 w-full rounded border border-stone-300 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600" onChange={(event) => setBody(event.target.value)} placeholder="Internal collaboration comment" value={body} />
+      <button className="mt-2 rounded bg-stone-800 px-3 py-1.5 text-sm text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={!body.trim()} onClick={submit} type="button">Post comment</button>
       {message ? <p className="mt-2 text-sm text-stone-700">{message}</p> : null}
+    </details>
+  );
+}
+
+export function ReplyComposer({ entryId, parentCommentId }: { entryId: string; parentCommentId: string }) {
+  const [body, setBody] = useState("");
+  const [message, setMessage] = useState("");
+
+  async function submit() {
+    const response = await fetch(`/api/entries/${entryId}/comments`, {
+      method: "POST",
+      headers: authHeaders("staff"),
+      body: JSON.stringify({ body, parentCommentId, mentions: [] })
+    });
+    setMessage(response.ok ? "Reply saved." : `Reply failed (${response.status}).`);
+    if (response.ok) window.location.reload();
+  }
+
+  return (
+    <details className="mt-2">
+      <summary className="cursor-pointer text-xs font-medium text-teal-800">Reply</summary>
+      <textarea className="mt-2 min-h-14 w-full rounded border border-stone-300 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600" onChange={(event) => setBody(event.target.value)} placeholder="Reply to this thread" value={body} />
+      <button className="mt-2 rounded bg-stone-800 px-3 py-1.5 text-xs text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={!body.trim()} onClick={submit} type="button">Post reply</button>
+      {message ? <span className="ml-2 text-xs text-stone-600">{message}</span> : null}
     </details>
   );
 }
@@ -164,7 +188,7 @@ export function CommentResolveButton({ commentId, resolved }: { commentId: strin
     window.location.reload();
   }
 
-  return <button className="rounded border border-stone-300 px-2 py-1 text-xs" onClick={submit} type="button">{resolved ? "Unresolve" : "Resolve"}</button>;
+  return <button className="rounded border border-stone-300 px-2 py-1 text-xs hover:bg-stone-50 focus:outline-none focus:ring-2 focus:ring-teal-600" onClick={submit} type="button">{resolved ? "Unresolve" : "Resolve"}</button>;
 }
 
 export function TaskComposer({ patientId, entryId, users }: { patientId: string; entryId?: string; users: AssignableUser[] }) {
@@ -182,14 +206,14 @@ export function TaskComposer({ patientId, entryId, users }: { patientId: string;
   }
 
   return (
-    <details className="rounded-md border border-stone-300 bg-white p-4">
-      <summary className="cursor-pointer text-lg font-semibold">Assign follow-up</summary>
-      <input className="mt-3 w-full rounded border border-stone-300 p-2" onChange={(event) => setTitle(event.target.value)} placeholder="Task title" value={title} />
+    <details className="rounded-md border border-stone-200 bg-white p-4 shadow-sm">
+      <summary className="cursor-pointer text-base font-semibold">+ Assign follow-up</summary>
+      <input className="mt-3 w-full rounded border border-stone-300 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600" onChange={(event) => setTitle(event.target.value)} placeholder="Task title" value={title} />
       <select className="mt-2 w-full rounded border border-stone-300 p-2" onChange={(event) => setAssignee(event.target.value)} value={assignee}>
         {users.map((user) => <option key={user.profile_id} value={user.profile_id}>{user.profiles?.display_name ?? user.profile_id} ({user.role})</option>)}
       </select>
-      <input className="mt-2 w-full rounded border border-stone-300 p-2" onChange={(event) => setDueDate(event.target.value)} type="date" value={dueDate} />
-      <button className="mt-3 rounded-md bg-teal-700 px-4 py-2 text-white" disabled={!title.trim() || !assignee} onClick={submit} type="button">Create task</button>
+      <input className="mt-2 w-full rounded border border-stone-300 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600" onChange={(event) => setDueDate(event.target.value)} type="date" value={dueDate} />
+      <button className="mt-3 rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50" disabled={!title.trim() || !assignee} onClick={submit} type="button">Create task</button>
     </details>
   );
 }
@@ -204,7 +228,7 @@ export function TaskStatusButton({ taskId, status }: { taskId: string; status: s
     window.location.reload();
   }
 
-  return <button className="rounded border border-stone-300 px-2 py-1 text-xs" onClick={submit} type="button">{status === "completed" ? "Reopen" : "Complete"}</button>;
+  return <button className="rounded border border-stone-300 px-2 py-1 text-xs hover:bg-stone-50 focus:outline-none focus:ring-2 focus:ring-teal-600" onClick={submit} type="button">{status === "completed" ? "Reopen" : "Complete"}</button>;
 }
 
 export function HighlightFeedbackButtons({ highlightId }: { highlightId: string }) {
@@ -222,9 +246,9 @@ export function HighlightFeedbackButtons({ highlightId }: { highlightId: string 
 
   return (
     <span className="inline-flex flex-wrap items-center gap-1">
-      <button className="rounded border border-stone-300 px-2 py-1 text-xs" onClick={() => submit("pin")} type="button">Pin</button>
-      <button className="rounded border border-stone-300 px-2 py-1 text-xs" onClick={() => submit("clinician_confirmation")} type="button">Confirm</button>
-      <button className="rounded border border-stone-300 px-2 py-1 text-xs" onClick={() => submit("rejection")} type="button">Reject</button>
+      <button className="rounded border border-stone-300 px-2 py-1 text-xs hover:bg-stone-50 focus:outline-none focus:ring-2 focus:ring-teal-600" onClick={() => submit("pin")} type="button">Pin</button>
+      <button className="rounded border border-teal-600 px-2 py-1 text-xs text-teal-900 hover:bg-teal-50 focus:outline-none focus:ring-2 focus:ring-teal-600" onClick={() => submit("clinician_confirmation")} type="button">Confirm suggestion</button>
+      <button className="rounded border border-stone-300 px-2 py-1 text-xs hover:bg-stone-50 focus:outline-none focus:ring-2 focus:ring-teal-600" onClick={() => submit("rejection")} type="button">Reject suggestion</button>
       {message ? <span className="text-xs text-stone-600">{message}</span> : null}
     </span>
   );
