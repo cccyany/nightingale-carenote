@@ -160,13 +160,13 @@ test(auth): cover role and clinic isolation
 
 ## M6 — Patient CareNote Page
 
-- [ ] Build patient header
-- [ ] Build CareNote layout
-- [ ] Build Timeline container
-- [ ] Add date separators
-- [ ] Add entry type badges
-- [ ] Visually distinguish AI and human entries
-- [ ] Add timeline filters
+- [x] Build patient header
+- [x] Build CareNote layout
+- [x] Build Timeline container
+- [x] Add date separators
+- [x] Add entry type badges
+- [x] Visually distinguish AI and human entries
+- [x] Add timeline filters
 
 Definition of Done:
 
@@ -180,16 +180,16 @@ feat(timeline): add longitudinal patient CareNote
 
 ## M7 — Notes & Collaboration
 
-- [ ] Add staff note creation
-- [ ] Add clinician note creation
-- [ ] Add comments
-- [ ] Add replies
-- [ ] Add resolve
-- [ ] Add unresolve
-- [ ] Add @mentions
-- [ ] Add task assignment
-- [ ] Add task completion
-- [ ] Enforce role ownership on writes
+- [x] Add staff note creation
+- [x] Add clinician note creation
+- [x] Add comments
+- [x] Add replies
+- [x] Add resolve
+- [x] Add unresolve
+- [x] Add @mentions
+- [x] Add task assignment
+- [x] Add task completion
+- [x] Enforce role ownership on writes
 
 Suggested commit:
 
@@ -201,15 +201,15 @@ feat(collaboration): add comments mentions and tasks
 
 ## M8 — Revision History
 
-- [ ] Snapshot every editable version
-- [ ] Increment version on edit
-- [ ] Build history view
-- [ ] Show version metadata
-- [ ] Add basic diff view
-- [ ] Implement revert
-- [ ] Ensure revert creates a new version
-- [ ] Preserve old versions
-- [ ] Add audit metadata
+- [x] Snapshot every editable version
+- [x] Increment version on edit
+- [x] Build history view
+- [x] Show version metadata
+- [x] Add basic diff view
+- [x] Implement revert
+- [x] Ensure revert creates a new version
+- [x] Preserve old versions
+- [x] Add audit metadata
 
 Suggested commit:
 
@@ -219,13 +219,13 @@ feat(history): add immutable revisions and revert
 
 ## M9 — Revision Tests
 
-- [ ] Implement tests/test_revision_history.py
-- [ ] Assert edit increments version
-- [ ] Assert revert restores prior content
-- [ ] Assert revert creates new version
-- [ ] Assert old versions remain
-- [ ] Assert audit actor metadata
-- [ ] Assert audit does not contain raw note contents
+- [x] Implement tests/test_revision_history.py
+- [x] Assert edit increments version
+- [x] Assert revert restores prior content
+- [x] Assert revert creates new version
+- [x] Assert old versions remain
+- [x] Assert audit actor metadata
+- [x] Assert audit does not contain raw note contents
 
 Definition of Done:
 
@@ -235,12 +235,12 @@ All revision tests pass.
 
 ## M10 — Concurrent Editing
 
-- [ ] Separate independently editable sections where appropriate
-- [ ] Add expected_version writes
-- [ ] Implement optimistic locking
-- [ ] Return HTTP 409 for stale same-section write
-- [ ] Build conflict review UI
-- [ ] Never silently use last-write-wins
+- [x] Separate independently editable sections where appropriate
+- [x] Add expected_version writes
+- [x] Implement optimistic locking
+- [x] Return HTTP 409 for stale same-section write
+- [x] Build conflict review UI
+- [x] Never silently use last-write-wins
 
 Suggested commit:
 
@@ -250,10 +250,10 @@ feat(concurrency): add optimistic section locking
 
 ## M11 — Concurrent Edit Tests
 
-- [ ] Implement tests/test_concurrent_edits.py
-- [ ] Test separate sections survive concurrent edits
-- [ ] Test same-section stale write returns conflict
-- [ ] Verify no silent overwrite
+- [x] Implement tests/test_concurrent_edits.py
+- [x] Test separate sections survive concurrent edits
+- [x] Test same-section stale write returns conflict
+- [x] Verify no silent overwrite
 
 ---
 

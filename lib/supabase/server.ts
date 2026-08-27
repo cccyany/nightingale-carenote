@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { CookieOptions } from "@supabase/ssr";
+import { normalizeSupabaseUrl } from "@/lib/supabase/url";
 
 type CookieToSet = {
   name: string;
@@ -17,7 +18,7 @@ export async function createSupabaseServerClient() {
     throw new Error("Supabase environment variables are not configured.");
   }
 
-  return createServerClient(supabaseUrl, supabaseAnonKey, {
+  return createServerClient(normalizeSupabaseUrl(supabaseUrl), supabaseAnonKey, {
     cookies: {
       getAll() {
         return cookieStore.getAll();

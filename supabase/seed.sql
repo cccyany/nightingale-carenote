@@ -1,11 +1,6 @@
-insert into auth.users (id, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
-values
-  ('10000000-0000-0000-0000-000000000001', 'patient.jane@example.test', crypt('demo-password', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{}', now(), now()),
-  ('10000000-0000-0000-0000-000000000002', 'staff.a@example.test', crypt('demo-password', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{}', now(), now()),
-  ('10000000-0000-0000-0000-000000000003', 'clinician.a@example.test', crypt('demo-password', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{}', now(), now()),
-  ('10000000-0000-0000-0000-000000000004', 'admin.a@example.test', crypt('demo-password', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{}', now(), now()),
-  ('10000000-0000-0000-0000-000000000005', 'staff.b@example.test', crypt('demo-password', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{}', now(), now())
-on conflict (id) do nothing;
+-- Auth users are created by scripts/bootstrap-supabase-demo.mjs through
+-- Supabase Auth Admin. That is safer for hosted projects than inserting
+-- directly into auth.users.
 
 insert into clinics (id, name) values
   ('20000000-0000-0000-0000-000000000001', 'Clinic A'),

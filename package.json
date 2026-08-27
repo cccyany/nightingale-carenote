@@ -8,7 +8,10 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "node --test"
+    "test": "node --test",
+    "supabase:bootstrap-auth": "node scripts/bootstrap-supabase-demo.mjs",
+    "supabase:apply": "node scripts/apply-supabase-foundation.mjs",
+    "supabase:verify": "node scripts/verify-supabase-foundation.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
@@ -22,10 +25,12 @@
     "@eslint/eslintrc": "^3.2.0",
     "@tailwindcss/postcss": "^4.0.0",
     "@types/node": "^22.10.5",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19.0.4",
     "@types/react-dom": "^19.0.2",
     "eslint": "^9.17.0",
     "eslint-config-next": "^15.1.4",
+    "pg": "^8.23.0",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.7.2"
   }

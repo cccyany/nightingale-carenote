@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { bearerToken, jsonError } from "@/lib/http";
-import { authorizeEntryEdit, getEntryForToken } from "@/lib/rbac";
+import { createSupabaseActorClient } from "@/lib/supabase/request";
 
 const editEntrySchema = z.object({
   expectedVersion: z.number().int().positive(),
@@ -13,11 +13,12 @@ export async function GET(
   context: { params: Promise<{ id: string }> }
 ) {
   const { id } = await context.params;
-  const result = getEntryForToken(bearerToken(request) ?? "", id);
-  if (!result.ok) {
-    return jsonError(result.status, result.error);
-  }
-  return NextResponse.json({ entry: result.entry });
+  const token = bearerToken(request);
+  if (!token) return jsonError(401, "Unauthorized");
+  const supabase = await createSupabaseActorClient(token);
+  const { data, error } = await supabase.from("care_entries").select("*").eq("id", id).single();
+  if (error) return jsonError(403, error.message);
+  return NextResponse.json({ entry: data });
 }
 
 export async function PATCH(
@@ -29,15 +30,19 @@ export async function PATCH(
   if (!body.success) {
     return jsonError(400, "Invalid edit payload");
   }
-  const result = authorizeEntryEdit(bearerToken(request) ?? "", id, body.data.expectedVersion);
-  if (!result.ok) {
-    return jsonError(result.status, result.error);
-  }
-  return NextResponse.json({
-    entry: {
-      ...result.entry,
-      content: body.data.content,
-      currentVersion: result.entry.currentVersion + 1
-    }
+  const token = bearerToken(request);
+  if (!token) return jsonError(401, "Unauthorized");
+  const supabase = await createSupabaseActorClient(token);
+  const { data, error } = await supabase.rpc("edit_care_entry", {
+    p_entry_id: id,
+    p_expected_version: body.data.expectedVersion,
+    p_content: body.data.content,
+    p_change_reason: "edited from CareNote"
   });
+  if (error) return jsonError(403, error.message);
+  if (data?.status === "conflict") {
+    return NextResponse.json({ currentVersion: data.current_version, currentContent: data.current_content }, { status: 409 });
+  }
+  if (data?.status !== "ok") return jsonError(404, "Entry not found");
+  return NextResponse.json(data);
 }

@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { bearerToken, jsonError } from "@/lib/http";
-import { authenticateToken, listPatientsForToken } from "@/lib/rbac";
+import { createSupabaseActorClient } from "@/lib/supabase/request";
 
-export function GET(request: NextRequest) {
+export async function GET(request: NextRequest) {
   const token = bearerToken(request);
-  const auth = authenticateToken(token);
-  if (!auth.ok) {
-    return jsonError(auth.status, auth.error);
+  if (!token) {
+    return jsonError(401, "Unauthorized");
   }
-  return NextResponse.json({ patients: listPatientsForToken(auth.user.token) });
+  const supabase = await createSupabaseActorClient(token);
+  const { data, error } = await supabase
+    .from("patients")
+    .select("id, clinic_id, display_name, date_of_birth, clinics(name)")
+    .order("display_name");
+
+  if (error) return jsonError(403, error.message);
+  return NextResponse.json({ patients: data ?? [] });
 }
