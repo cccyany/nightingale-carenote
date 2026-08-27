@@ -580,7 +580,7 @@ feat(voice): add synthetic ambient consult capture
 - [x] Record P50
 - [x] Record P95
 - [x] Record P99 where available
-- [ ] Verify P95 <= 300 ms
+- [x] Verify P95 <= 300 ms
 - [x] Document methodology
 
 Suggested commit:
