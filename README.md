@@ -1,35 +1,191 @@
 # Nightingale CareNote
 
-Safe longitudinal care-note prototype for the Nightingale 72 Hour Build.
+Nightingale CareNote is a synthetic longitudinal care-note workspace for the Nightingale 72 Hour Build. It brings clinician notes, staff notes, patient-submitted information, AI-scribed summaries, comments, tasks, provenance, conflicts, and patient-approved content into one consult view.
 
-## Local Setup
+Core principle: **AI proposes. Humans verify. Provenance proves.**
+
+Product promise: **Know what matters. Know why. Know where it came from.**
+
+All repository data is synthetic. Do not add real patient data or real PHI.
+
+## Demo Scenarios and Roles
+
+Open `/login` and use the synthetic demo-role navigation:
+
+- `patient.jane@example.test` / Jane Tan patient-safe view
+- `staff.a@example.test` / Clinic A staff workflow
+- `clinician.a@example.test` / Clinic A clinician review and approval
+- `admin.a@example.test` / Clinic A scoped oversight
+- `staff.b@example.test` / Clinic B isolation test user
+
+Jane Tan is the golden demo patient in Clinic A:
+
+- Apr 15 2025: clinician-documented penicillin allergy
+- Feb 6 2026: AI nurse summary says no known drug allergies
+- Aug 2026: persistent nocturnal cough
+- Aug 2026: repeat renal panel discussed but not ordered
+- medication/dose conflict, approved patient-facing content, HOT/WARM/COLD ranking, adaptive importance, and optional synthetic voice capture
+
+Role switching is demo navigation only. Security is enforced server-side and by PostgreSQL Row Level Security.
+
+## Architecture
+
+Next.js App Router renders the care workspace and API routes. Supabase Auth identifies actors. PostgreSQL stores the longitudinal record and enforces RLS. Python pytest covers real Supabase/RLS integration boundaries, revision history, provenance, redaction, conflicts, patient approval, self-learning, and voice safety.
+
+```mermaid
+flowchart LR
+  UI[Next.js UI] --> API[Next.js API routes]
+  API --> Auth[Supabase Auth token]
+  API --> DB[(PostgreSQL + RLS)]
+  DB --> Timeline[Care entries + versions]
+  DB --> Trust[Provenance + facts + conflicts]
+  DB --> Glance[Persisted ranked Glance items]
+  Raw[Patient-derived text] --> Redact[PHI redaction gate]
+  Redact --> Provider[Mock or configured AI provider]
+  Provider --> Extract[Structured candidates]
+  Extract --> Trust
+```
+
+Warm consult reads use precomputed `glance_items` through `read_patient_glance`; no LLM call or extraction runs on that path. Write/ingestion paths create entries, provenance spans, facts, conflicts, patient-facing drafts, feedback, and ranked Glance rows.
+
+## Setup
 
 ```powershell
 npm.cmd install
+copy .env.example .env.local
+npm.cmd run supabase:bootstrap-auth
+npm.cmd run supabase:apply
+npm.cmd run supabase:verify
 npm.cmd run dev
 ```
 
 Open `http://localhost:3000/login`.
 
-Copy `.env.example` to `.env.local` and fill Supabase values when connecting to a hosted or local Supabase project. The SQL schema and synthetic seed data live in `supabase/migrations` and `supabase/seed.sql`.
+Required environment variables:
 
-For real database validation, create Auth users first, then apply the SQL through a direct database connection:
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_DB_URL` using the Supabase Session Pooler connection string
+- optional AI provider variables if a real provider is configured; the app works with deterministic/mock providers without a paid key
+
+## Validation Commands
 
 ```powershell
-npm.cmd run supabase:bootstrap-auth
-$env:SUPABASE_DB_URL="postgresql://..."
 npm.cmd run supabase:apply
 npm.cmd run supabase:verify
-pytest -m supabase_integration
-```
-
-## Validation
-
-```powershell
 npm.cmd run lint
 npm.cmd run typecheck
 npm.cmd test
 pytest
+npm.cmd run build
+npm.cmd run evaluate:fixtures
+npm.cmd run benchmark:glance
 ```
 
-All committed data is synthetic demo data only.
+## Security Model
+
+RBAC roles are `patient`, `staff`, `clinician`, and `admin`. Staff, clinicians, and admins are clinic-scoped. Patients can only see explicitly patient-safe approved content and intended patient-submitted information.
+
+PostgreSQL RLS protects base tables. Patients cannot retrieve raw AI-scribed notes, staff/clinician internal notes, internal comments, or unapproved AI-generated guidance. Clinic A users cannot access Clinic B data. Server routes also validate actor roles; UI filtering is not treated as the security boundary.
+
+The optimized `read_patient_glance` RPC is `SECURITY DEFINER` with fixed `search_path = public`, explicit patient lookup, and an explicit `user_has_clinic_role` check before returning Clinic-scoped rows.
+
+## Collaboration, Revisions, and Concurrency
+
+Staff create staff notes; clinicians create clinician notes. Each edit creates an immutable `entry_versions` snapshot and increments `current_version`. Reverting creates a new version containing the older content; intermediate versions remain. Audit events store actor/action/resource/version metadata, not raw clinical note text.
+
+Clinical edits use optimistic concurrency. Writes include `expected_version`; stale same-entry edits fail with HTTP 409 rather than silently using last-write-wins.
+
+## Trust Model
+
+AI-scribed entries are `author_role = system` and remain visually distinct from human notes. Structured extraction is preferred over generation for clinical facts. Candidates require exact evidence text, character offsets, source entry/version, and provenance resolution before becoming trusted.
+
+Provenance spans resolve to source entry, version, evidence offsets, evidence text, and transcript timestamps where applicable. If offsets are invalid, evidence text does not match, source is missing, or evidence is ambiguous, the system abstains and marks the item `needs_review`.
+
+Risk is clinical severity; importance is what should be seen first now. Deterministic risk floors include allergy conflict, medication conflict, medication-dose conflict, and unresolved critical task as HIGH. A model suggestion may raise risk but cannot lower these floors.
+
+Evidence confidence is evidence quality, not calibrated clinical probability:
+
+- Strong evidence: clinician-authored/confirmed or high-quality deterministic evidence
+- Supported: exact provenance with no contradiction
+- Needs review: ambiguous, contradictory, unresolved, or low-confidence evidence
+
+Patient-facing AI content starts as draft or needs clinician approval. Only explicitly approved content is visible to patients; unresolved provenance or insufficient trust blocks approval.
+
+## Importance, Learning, and Decay
+
+Explainable importance ranking persists score components: risk contribution, unresolved action, recency, clinician confirmation, entity priority, decay, and bounded adaptive feedback. Tie-breaking is deterministic.
+
+Adaptive learning is clinic-scoped and bounded. It tracks exposure, manual highlight, pin, clinician confirmation, comments/interactions, and rejection. Exposure is not rejection. Learning changes importance only; it never changes facts, provenance, evidence quality, deterministic risk, or clinician confirmation.
+
+Data decay classifies Glance items as:
+
+- `HOT`: recent, unresolved, safety-critical, active, or immediately actionable
+- `WARM`: older but longitudinally relevant
+- `COLD`: old ordinary resolved context retained for history/provenance
+
+Decay affects ranking/read behavior only. Source history, versions, provenance, facts, conflicts, and audit logs are retained.
+
+## PHI Redaction and AI Providers
+
+Every LLM call goes through the centralized safe AI gateway:
+
+`raw input -> redaction -> verification -> provider`
+
+The current redactor detects synthetic names, Singapore NRIC/FIN-like identifiers, phone numbers, email addresses, and obvious structured identifiers. Metadata reports classes/counts without exposing original values. If verification cannot establish a safe payload, the request is blocked and marked for review.
+
+The provider abstraction supports deterministic/mock providers for tests/demo fallback and optional configured real providers. No secrets are committed.
+
+## Ambient Voice
+
+Synthetic ambient capture demonstrates architecture only: synthetic audio/transcript upload, deterministic transcription abstraction, speaker-labelled segments, timestamps, uncertainty markers, redaction before AI processing, AI-scribed entry creation, and timestamp provenance. It does not claim production diarization, noisy-room, multilingual, or code-switching accuracy.
+
+## Performance
+
+Benchmark command:
+
+```powershell
+npm.cmd run benchmark:glance
+```
+
+Latest measured warm Supabase/PostgREST path in `docs/performance/glance-benchmark.json`:
+
+- warm-up requests: 10
+- measured requests: 50
+- concurrency: 1
+- network included: yes
+- P50: 169.25 ms
+- P95: 203.45 ms
+- P99: 223.16 ms
+- failures: 0
+- target: P95 <= 300 ms
+- result: target met
+
+The benchmark measures the persisted `read_patient_glance` warm path and records that no LLM call or extraction is performed.
+
+## Evaluation Fixtures
+
+Synthetic evaluation fixtures live in `eval/` and are run with:
+
+```powershell
+npm.cmd run evaluate:fixtures
+```
+
+Current report:
+
+- redaction: 5 cases, 7 expected detections, 0 missed detections, 1 measurable false positive, recall 1.00 on the fixture set
+- extraction: 6 cases, 9 expected candidates, 7 matched, 7 trusted candidates with resolvable provenance, 2/2 abstention cases matched
+- conflicts: 6/6 deterministic expected behaviors matched
+
+These are prototype evaluation evidence on small synthetic fixtures, not clinical validation or production-grade redaction/extraction accuracy.
+
+## Known Limitations
+
+- This is a prototype, not a certified clinical system.
+- Synthetic fixtures are intentionally small and cannot establish real-world accuracy.
+- Physical archival/compression is deferred; HOT/WARM/COLD currently affects classification and ranking only.
+- Collaboration uses section/entry optimistic concurrency rather than CRDTs.
+- Revision history stores full snapshots rather than complex semantic diff objects.
+- AI and transcription providers are abstracted; deterministic mock providers keep the demo working without paid credentials.
+- Ambient voice capture is synthetic and not validated for real clinical audio.

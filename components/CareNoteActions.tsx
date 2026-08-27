@@ -51,8 +51,9 @@ export function NoteComposer({ patientId }: { patientId: string }) {
   }
 
   return (
-    <section className="rounded-md border border-stone-300 bg-white p-4">
-      <h2 className="text-lg font-semibold">Add note</h2>
+    <details className="rounded-md border border-stone-300 bg-white p-4">
+      <summary className="cursor-pointer text-lg font-semibold">Add care-team note</summary>
+      <p className="mt-2 text-sm text-stone-600">Demo navigation only. The server decides which role can write.</p>
       <div className="mt-3 flex flex-wrap gap-2">
         {demoTokens.slice(0, 2).map(([value, label]) => (
           <button
@@ -65,24 +66,17 @@ export function NoteComposer({ patientId }: { patientId: string }) {
           </button>
         ))}
       </div>
-      <textarea
-        className="mt-3 min-h-24 w-full rounded-md border border-stone-300 p-3"
-        onChange={(event) => setContent(event.target.value)}
-        placeholder="Synthetic note text"
-        value={content}
-      />
-      <button className="mt-3 rounded-md bg-teal-700 px-4 py-2 text-white" disabled={!content.trim()} onClick={submit} type="button">
-        Save note
-      </button>
+      <textarea className="mt-3 min-h-24 w-full rounded-md border border-stone-300 p-3" onChange={(event) => setContent(event.target.value)} placeholder="Synthetic note text" value={content} />
+      <button className="mt-3 rounded-md bg-teal-700 px-4 py-2 text-white" disabled={!content.trim()} onClick={submit} type="button">Save note</button>
       {message ? <p className="mt-2 text-sm text-stone-700">{message}</p> : null}
-    </section>
+    </details>
   );
 }
 
 export function EntryEditor({ entry }: { entry: Entry }) {
   const [role, setRole] = useState(entry.author_role === "clinician" ? "clinician" : "staff");
   const [content, setContent] = useState("");
-  const [expectedVersion, setExpectedVersion] = useState(entry.current_version);
+  const [expectedVersion] = useState(entry.current_version);
   const [message, setMessage] = useState("");
   const [conflict, setConflict] = useState<string | null>(null);
 
@@ -105,18 +99,12 @@ export function EntryEditor({ entry }: { entry: Entry }) {
   }
 
   return (
-    <div className="mt-3 rounded-md border border-stone-200 bg-stone-50 p-3">
-      <div className="flex flex-wrap items-center gap-2">
+    <details className="mt-3 rounded-md border border-stone-200 bg-stone-50 p-3">
+      <summary className="cursor-pointer text-sm font-semibold">Edit</summary>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         <select className="rounded border border-stone-300 p-1 text-sm" onChange={(event) => setRole(event.target.value)} value={role}>
           {demoTokens.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
-        <input
-          className="w-24 rounded border border-stone-300 p-1 text-sm"
-          min={1}
-          onChange={(event) => setExpectedVersion(Number(event.target.value))}
-          type="number"
-          value={expectedVersion}
-        />
       </div>
       <textarea className="mt-2 min-h-20 w-full rounded border border-stone-300 p-2 text-sm" onChange={(event) => setContent(event.target.value)} placeholder="Replacement content" value={content} />
       <button className="mt-2 rounded bg-stone-800 px-3 py-1 text-sm text-white" disabled={!content.trim()} onClick={submit} type="button">
@@ -129,14 +117,13 @@ export function EntryEditor({ entry }: { entry: Entry }) {
           <p className="mt-1">{conflict}</p>
         </div>
       ) : null}
-    </div>
+    </details>
   );
 }
 
 export function CommentComposer({ entryId, users }: { entryId: string; users: AssignableUser[] }) {
   const [body, setBody] = useState("");
   const [mention, setMention] = useState("");
-  const [parentCommentId, setParentCommentId] = useState("");
   const [message, setMessage] = useState("");
 
   async function submit() {
@@ -145,7 +132,7 @@ export function CommentComposer({ entryId, users }: { entryId: string; users: As
       headers: authHeaders("staff"),
       body: JSON.stringify({
         body,
-        parentCommentId: parentCommentId || null,
+        parentCommentId: null,
         mentions: mention ? [mention] : []
       })
     });
@@ -154,9 +141,8 @@ export function CommentComposer({ entryId, users }: { entryId: string; users: As
   }
 
   return (
-    <div className="mt-3 rounded-md border border-stone-200 p-3">
-      <h3 className="text-sm font-semibold">Comment</h3>
-      <input className="mt-2 w-full rounded border border-stone-300 p-2 text-sm" onChange={(event) => setParentCommentId(event.target.value)} placeholder="Reply to comment ID, optional" value={parentCommentId} />
+    <details className="mt-3 rounded-md border border-stone-200 p-3">
+      <summary className="cursor-pointer text-sm font-semibold">Comment</summary>
       <select className="mt-2 w-full rounded border border-stone-300 p-2 text-sm" onChange={(event) => setMention(event.target.value)} value={mention}>
         <option value="">No mention</option>
         {users.map((user) => <option key={user.profile_id} value={user.profile_id}>@{user.profiles?.display_name ?? user.profile_id} ({user.role})</option>)}
@@ -164,7 +150,7 @@ export function CommentComposer({ entryId, users }: { entryId: string; users: As
       <textarea className="mt-2 min-h-16 w-full rounded border border-stone-300 p-2 text-sm" onChange={(event) => setBody(event.target.value)} placeholder="Internal collaboration comment" value={body} />
       <button className="mt-2 rounded bg-stone-800 px-3 py-1 text-sm text-white" disabled={!body.trim()} onClick={submit} type="button">Post</button>
       {message ? <p className="mt-2 text-sm text-stone-700">{message}</p> : null}
-    </div>
+    </details>
   );
 }
 
@@ -196,15 +182,15 @@ export function TaskComposer({ patientId, entryId, users }: { patientId: string;
   }
 
   return (
-    <section className="rounded-md border border-stone-300 bg-white p-4">
-      <h2 className="text-lg font-semibold">Assign task</h2>
+    <details className="rounded-md border border-stone-300 bg-white p-4">
+      <summary className="cursor-pointer text-lg font-semibold">Assign follow-up</summary>
       <input className="mt-3 w-full rounded border border-stone-300 p-2" onChange={(event) => setTitle(event.target.value)} placeholder="Task title" value={title} />
       <select className="mt-2 w-full rounded border border-stone-300 p-2" onChange={(event) => setAssignee(event.target.value)} value={assignee}>
         {users.map((user) => <option key={user.profile_id} value={user.profile_id}>{user.profiles?.display_name ?? user.profile_id} ({user.role})</option>)}
       </select>
       <input className="mt-2 w-full rounded border border-stone-300 p-2" onChange={(event) => setDueDate(event.target.value)} type="date" value={dueDate} />
       <button className="mt-3 rounded-md bg-teal-700 px-4 py-2 text-white" disabled={!title.trim() || !assignee} onClick={submit} type="button">Create task</button>
-    </section>
+    </details>
   );
 }
 

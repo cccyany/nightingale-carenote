@@ -184,7 +184,7 @@ export async function getPatientCareNote(patientId: string, filter: TimelineFilt
     .from("care_entries")
     .select(entrySelect)
     .eq("patient_id", patientId)
-    .order("occurred_at", { ascending: true });
+    .order("occurred_at", { ascending: false });
 
   if (filter === "ai") {
     query = query.like("entry_type", "ai_%");

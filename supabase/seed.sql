@@ -2,6 +2,64 @@
 -- Supabase Auth Admin. That is safer for hosted projects than inserting
 -- directly into auth.users.
 
+-- Keep the golden Jane Tan demo readable after repeated integration runs.
+-- These patterns target only synthetic test artifacts; fixed longitudinal demo
+-- records use stable UUIDs below and are preserved.
+delete from tasks
+where title like 'Synthetic collaboration follow-up%';
+
+delete from patient_facing_content
+where title like 'Synthetic patient approval%'
+   or title like 'Synthetic rejected draft%'
+   or title like 'Synthetic low trust draft%'
+   or title like 'Synthetic approved summary%'
+   or title = 'Synthetic unresolved draft';
+
+delete from transcript_sessions
+where source_label like 'Synthetic ambient consult test%';
+
+delete from highlights
+where title like 'Synthetic baseline cough candidate%'
+   or title like 'Synthetic future cough candidate%'
+   or title like 'Synthetic exposure baseline%'
+   or title like 'Synthetic exposed future%'
+   or title like 'Synthetic rejection baseline%'
+   or title like 'Synthetic rejection future%'
+   or title like 'Synthetic Clinic A learning item%'
+   or title like 'Synthetic Clinic B comparison item%'
+   or title like 'Synthetic safety baseline%'
+   or title like 'Synthetic safety future%'
+   or title like 'Synthetic unsupported candidate%';
+
+delete from care_entries ce
+where ce.patient_id = '30000000-0000-0000-0000-000000000001'
+  and (
+    ce.content like 'Synthetic collaboration note %'
+    or ce.content like 'Synthetic initial plan %'
+    or ce.content in (
+      'Synthetic revision base.',
+      'Synthetic revision middle.',
+      'Synthetic audit base.',
+      'Synthetic audit updated content.',
+      'Synthetic updated clinician plan.',
+      'Synthetic staff independent update.',
+      'Synthetic clinician independent update.',
+      'Synthetic first writer wins.',
+      'Synthetic stale overwrite attempt.',
+      'Synthetic clinician cross-role overwrite attempt.',
+      'Synthetic ambient summary.'
+    )
+    or ce.content like 'Synthetic staff base %'
+    or ce.content like 'Synthetic clinician base %'
+    or ce.content like 'Synthetic concurrent base %'
+    or ce.content like 'Synthetic staff-owned note %'
+    or ce.content like 'Synthetic provenance base %'
+    or ce.content like 'Synthetic extraction base %'
+  )
+  and not exists (
+    select 1 from provenance_sources ps where ps.source_entry_id = ce.id
+  );
+
 insert into clinics (id, name) values
   ('20000000-0000-0000-0000-000000000001', 'Clinic A'),
   ('20000000-0000-0000-0000-000000000002', 'Clinic B')

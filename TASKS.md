@@ -607,53 +607,53 @@ perf(glance): benchmark warm consult path
 
 Only after core tests pass.
 
-- [ ] Improve Glance hierarchy
-- [ ] Improve timeline readability
-- [ ] Improve AI badges
-- [ ] Improve conflict review UI
-- [ ] Improve source highlighting
-- [ ] Improve version diff UI
-- [ ] Add loading states
-- [ ] Add error states
-- [ ] Add empty states
-- [ ] Verify responsive layout
+- [x] Improve Glance hierarchy
+- [x] Improve timeline readability
+- [x] Improve AI badges
+- [x] Improve conflict review UI
+- [x] Improve source highlighting
+- [x] Improve version diff UI
+- [x] Add loading states
+- [x] Add error states
+- [x] Add empty states
+- [x] Verify responsive layout
 
 ---
 
 ## M35 — README
 
-- [ ] Product overview
-- [ ] Architecture
-- [ ] Setup instructions
-- [ ] Environment variables
-- [ ] Demo accounts
-- [ ] RBAC explanation
-- [ ] RLS explanation
-- [ ] Redaction explanation
-- [ ] AI trust model
-- [ ] Provenance
-- [ ] Risk semantics
-- [ ] Confidence semantics
-- [ ] Abstention
-- [ ] Revision strategy
-- [ ] Concurrency strategy
-- [ ] Conflict detection
-- [ ] Self-learning
-- [ ] Data decay
-- [ ] Performance methodology
-- [ ] Test commands
-- [ ] Known limitations
-- [ ] Synthetic data disclaimer
+- [x] Product overview
+- [x] Architecture
+- [x] Setup instructions
+- [x] Environment variables
+- [x] Demo accounts
+- [x] RBAC explanation
+- [x] RLS explanation
+- [x] Redaction explanation
+- [x] AI trust model
+- [x] Provenance
+- [x] Risk semantics
+- [x] Confidence semantics
+- [x] Abstention
+- [x] Revision strategy
+- [x] Concurrency strategy
+- [x] Conflict detection
+- [x] Self-learning
+- [x] Data decay
+- [x] Performance methodology
+- [x] Test commands
+- [x] Known limitations
+- [x] Synthetic data disclaimer
 
 ---
 
 ## M36 — ATTRIBUTION
 
-- [ ] List every external library
-- [ ] List license for every library
-- [ ] List models/services
-- [ ] Verify license information from authoritative sources
-- [ ] Do not guess licenses
+- [x] List every external library
+- [x] List license for every library
+- [x] List models/services
+- [x] Verify license information from authoritative sources
+- [x] Do not guess licenses
 
 ---
 
@@ -661,21 +661,21 @@ Only after core tests pass.
 
 2–3 pages.
 
-- [ ] Architecture diagram
-- [ ] Architecture explanation
-- [ ] Comprehensive schema
-- [ ] Trust model
-- [ ] Provenance model
-- [ ] Risk model
-- [ ] Confidence semantics
-- [ ] Abstention
-- [ ] RBAC
-- [ ] Redaction
-- [ ] Performance
-- [ ] Self-learning
-- [ ] Data decay
-- [ ] Assumptions
-- [ ] Trade-offs
+- [x] Architecture diagram
+- [x] Architecture explanation
+- [x] Comprehensive schema
+- [x] Trust model
+- [x] Provenance model
+- [x] Risk model
+- [x] Confidence semantics
+- [x] Abstention
+- [x] RBAC
+- [x] Redaction
+- [x] Performance
+- [x] Self-learning
+- [x] Data decay
+- [x] Assumptions
+- [x] Trade-offs
 
 ---
 
@@ -683,37 +683,37 @@ Only after core tests pass.
 
 Scenario A:
 
-- [ ] Staff opens patient
-- [ ] Glance understandable immediately
-- [ ] Click AI-derived highlight
-- [ ] Jump to exact source
+- [x] Staff opens patient
+- [x] Glance understandable immediately
+- [x] Click AI-derived highlight
+- [x] Jump to exact source
 
 Scenario B:
 
-- [ ] Staff adds note
-- [ ] Staff comments with @clinician
-- [ ] Assign follow-up
-- [ ] Clinician confirms AI phrase
-- [ ] Clinician edits plan
-- [ ] Show revision
-- [ ] Revert version
+- [x] Staff adds note
+- [x] Staff comments with @clinician
+- [x] Assign follow-up
+- [x] Clinician confirms AI phrase
+- [x] Clinician edits plan
+- [x] Show revision
+- [x] Revert version
 
 Scenario C:
 
-- [ ] Show April 2025
-- [ ] Show February 2026
-- [ ] Show August 2026
-- [ ] Explain importance
-- [ ] Explain adaptive learning
-- [ ] Explain decay
+- [x] Show April 2025
+- [x] Show February 2026
+- [x] Show August 2026
+- [x] Explain importance
+- [x] Explain adaptive learning
+- [x] Explain decay
 
 Security:
 
-- [ ] Patient request for raw AI note returns 403
+- [x] Patient request for raw AI note returns 403
 
 Privacy:
 
-- [ ] Show synthetic PHI redaction before LLM
+- [x] Show synthetic PHI redaction before LLM
 
 ---
 

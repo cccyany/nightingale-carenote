@@ -76,7 +76,7 @@ def test_threaded_comments_mentions_and_task_completion_persist(staff_session, s
         "create_task",
         {
             "p_patient_id": JANE_PATIENT_ID,
-            "p_title": "Synthetic collaboration follow-up",
+            "p_title": f"Synthetic collaboration follow-up {uuid.uuid4()}",
             "p_assignee_id": STAFF_ID,
             "p_source_entry_id": entry["id"],
             "p_due_date": "2026-08-28",

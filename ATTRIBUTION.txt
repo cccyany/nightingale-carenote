@@ -1,97 +1,115 @@
-NIGHTINGALE CARENOTE
-EXTERNAL LIBRARIES, MODELS, AND SERVICES
+Nightingale CareNote Attribution
+================================
 
-This file records external software, libraries, models, services,
-assets, and other third-party resources used in this project.
+This file lists external libraries, services, and resources actually used by the repository. License data was checked from local package manifests where available. Items marked "manual verification" require a human to confirm service terms against the current provider website before external distribution.
 
-IMPORTANT:
-License information must be verified against the authoritative
-package/repository/source before final submission.
+Application libraries
+---------------------
 
-==================================================
-APPLICATION FRAMEWORK
-==================================================
+- Next.js
+  Purpose: React framework and App Router runtime.
+  License: MIT, from node_modules/next/package.json.
+  Source: https://github.com/vercel/next.js and https://nextjs.org
 
-Next.js
-Purpose:
-License:
-Source:
+- React
+  Purpose: user interface library.
+  License: MIT, from node_modules/react/package.json.
+  Source: https://github.com/facebook/react and https://react.dev
 
-React
-Purpose:
-License:
-Source:
+- React DOM
+  Purpose: browser DOM renderer for React.
+  License: MIT, from node_modules/react-dom/package.json.
+  Source: https://github.com/facebook/react
 
-==================================================
-UI / STYLING
-==================================================
+- @supabase/supabase-js
+  Purpose: Supabase Auth/PostgREST client.
+  License: MIT, from node_modules/@supabase/supabase-js/package.json.
+  Source: https://github.com/supabase/supabase-js
 
-Tailwind CSS
-Purpose:
-License:
-Source:
+- @supabase/ssr
+  Purpose: Supabase helpers for server-side rendered applications.
+  License: MIT, from node_modules/@supabase/ssr/package.json.
+  Source: https://github.com/supabase/ssr
 
-[Add additional UI libraries actually used.]
+- zod
+  Purpose: request and data validation.
+  License: MIT, from node_modules/zod/package.json.
+  Source: https://github.com/colinhacks/zod and https://zod.dev
 
-==================================================
-DATABASE / AUTHENTICATION
-==================================================
+Database and tooling
+--------------------
 
-Supabase
-Purpose:
-License / service terms:
-Source:
+- PostgreSQL
+  Purpose: relational database, constraints, RLS, and SQL functions.
+  License: PostgreSQL License; service/runtime license should be verified for the deployed database environment.
+  Source: https://www.postgresql.org
 
-PostgreSQL
-Purpose:
-License:
-Source:
+- Supabase platform
+  Purpose: hosted PostgreSQL, Auth, PostgREST, and service-role administration for the demo.
+  Terms/license: manual verification required for current Supabase hosted-service terms. Supabase JavaScript packages used by the app are MIT as listed above.
+  Source: https://supabase.com
 
-==================================================
-AI / MODELS
-==================================================
+- pg
+  Purpose: Node.js PostgreSQL client for migration, verification, and benchmark scripts.
+  License: MIT, from node_modules/pg/package.json.
+  Source: https://github.com/brianc/node-postgres
 
-[Model/provider actually used]
-Purpose:
-Model:
-Terms / license:
-Source:
+- TypeScript
+  Purpose: static typing and type checking.
+  License: Apache-2.0, from node_modules/typescript/package.json.
+  Source: https://github.com/microsoft/TypeScript
 
-==================================================
-TESTING
-==================================================
+- Tailwind CSS
+  Purpose: CSS utility styling.
+  License: MIT, from node_modules/tailwindcss/package.json.
+  Source: https://github.com/tailwindlabs/tailwindcss and https://tailwindcss.com
 
-pytest
-Purpose:
-License:
-Source:
+- @tailwindcss/postcss
+  Purpose: Tailwind PostCSS integration.
+  License: MIT, from node_modules/@tailwindcss/postcss/package.json.
+  Source: https://github.com/tailwindlabs/tailwindcss
 
-[Add Playwright or other test libraries only if actually used.]
+- ESLint
+  Purpose: JavaScript/TypeScript linting.
+  License: MIT, from node_modules/eslint/package.json.
+  Source: https://github.com/eslint/eslint
 
-==================================================
-VOICE / TRANSCRIPTION
-==================================================
+- eslint-config-next
+  Purpose: Next.js ESLint configuration.
+  License: MIT, from node_modules/eslint-config-next/package.json.
+  Source: https://github.com/vercel/next.js
 
-[Only include if implemented.]
+- @eslint/eslintrc
+  Purpose: ESLint configuration compatibility helper.
+  License: MIT, from node_modules/@eslint/eslintrc/package.json.
+  Source: https://github.com/eslint/eslintrc
 
-==================================================
-ICONS / ASSETS
-==================================================
+- @types/node, @types/react, @types/react-dom, @types/pg
+  Purpose: TypeScript type declarations.
+  License: MIT, from local package manifests in node_modules/@types/*/package.json.
+  Source: https://github.com/DefinitelyTyped/DefinitelyTyped
 
-[List icon libraries, fonts, images, or other third-party assets
-actually included in the project.]
+Python test tooling
+-------------------
 
-==================================================
-OTHER DEPENDENCIES
-==================================================
+- pytest
+  Purpose: Python test runner for RBAC/RLS, provenance, revision, concurrency, redaction, patient safety, self-learning, and voice tests.
+  License: MIT in the installed package metadata should be manually verified against the project release used in the evaluator environment.
+  Source: https://github.com/pytest-dev/pytest and https://pytest.org
 
-[Add all other externally sourced libraries or resources used.]
+Models, transcription, assets, and fonts
+----------------------------------------
 
-==================================================
-NOTES
-==================================================
+- AI provider abstraction
+  Purpose: safe gateway interface for optional LLM use.
+  Provider actually required for tests/demo: deterministic/mock provider implemented in repository code.
+  License/terms: no external model service is required for the committed demo path. Any configured real provider terms require manual verification before use.
 
-- Synthetic patient data only.
-- No real patient records or PHI are included in the repository.
-- Do not list tools that were considered but not actually used.
-- Verify all licenses and service terms before submission.
+- Transcription provider abstraction
+  Purpose: synthetic ambient voice capture path.
+  Provider actually required for tests/demo: deterministic/mock transcription provider implemented in repository code.
+  License/terms: no external transcription service is required for the committed demo path. Any configured real provider terms require manual verification before use.
+
+- Visual assets/icons/fonts
+  Purpose: none beyond framework/system CSS and text-based UI in the committed app.
+  License/terms: no external image, icon, or font asset was added for this pass.
