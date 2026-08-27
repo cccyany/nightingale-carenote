@@ -26,6 +26,7 @@ const expectedTables = [
   "fact_conflicts",
   "importance_feedback",
   "glance_items",
+  "patient_facing_content",
   "audit_events"
 ];
 
@@ -70,7 +71,13 @@ try {
       "set_task_status",
       "validate_provenance_span",
       "deterministic_risk_floor",
-      "seed_jane_trust_glance"
+      "seed_jane_trust_glance",
+      "create_provenance_for_entry_span",
+      "upsert_fact_from_span",
+      "detect_fact_conflicts_for_patient",
+      "ingest_ai_scribed_note",
+      "create_patient_facing_draft",
+      "set_patient_content_status"
     ]]
   );
 
@@ -80,10 +87,10 @@ try {
     constraintCount: constraints.rows[0].count,
     indexCount: indexes.rows[0].count,
     policyCount: policies.rows[0].count,
-    collaborationFunctions: functions.rows.map((row) => row.proname).sort()
+    requiredFunctions: functions.rows.map((row) => row.proname).sort()
   }, null, 2));
 
-  if (missingTables.length || missingRls.length || policies.rows[0].count < 10) {
+  if (missingTables.length || missingRls.length || policies.rows[0].count < 12 || functions.rows.length < 16) {
     process.exit(1);
   }
 } finally {

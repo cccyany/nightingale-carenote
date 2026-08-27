@@ -352,13 +352,13 @@ feat(safety): add deterministic clinical risk floors
 
 ## M18 — PHI Redaction
 
-- [ ] Implement name redaction
-- [ ] Implement ID/IC redaction
-- [ ] Implement phone redaction
-- [ ] Implement redaction verification
-- [ ] Block LLM call on verification failure
-- [ ] Centralize all LLM calls behind safe gateway
-- [ ] Prevent PHI in AI logs
+- [x] Implement name redaction
+- [x] Implement ID/IC redaction
+- [x] Implement phone redaction
+- [x] Implement redaction verification
+- [x] Block LLM call on verification failure
+- [x] Centralize all LLM calls behind safe gateway
+- [x] Prevent PHI in AI logs
 
 Suggested commit:
 
@@ -368,26 +368,26 @@ feat(ai): add mandatory PHI redaction gateway
 
 ## M19 — Redaction Tests
 
-- [ ] Implement tests/test_redaction.py
-- [ ] Test synthetic names
-- [ ] Test synthetic IDs
-- [ ] Test Singapore-style phone numbers
-- [ ] Test verification failure
-- [ ] Assert LLM adapter is not called after failure
+- [x] Implement tests/test_redaction.py
+- [x] Test synthetic names
+- [x] Test synthetic IDs
+- [x] Test Singapore-style phone numbers
+- [x] Test verification failure
+- [x] Assert LLM adapter is not called after failure
 
 ---
 
 ## M20 — Structured AI Extraction
 
-- [ ] Add LLM adapter interface
-- [ ] Add deterministic/mock adapter for tests
-- [ ] Add production LLM adapter
-- [ ] Request structured facts
-- [ ] Require evidence text
-- [ ] Require source offsets
-- [ ] Validate returned evidence
-- [ ] Reject invalid evidence
-- [ ] Abstain on unsupported extraction
+- [x] Add LLM adapter interface
+- [x] Add deterministic/mock adapter for tests
+- [x] Add production LLM adapter
+- [x] Request structured facts
+- [x] Require evidence text
+- [x] Require source offsets
+- [x] Validate returned evidence
+- [x] Reject invalid evidence
+- [x] Abstain on unsupported extraction
 
 Suggested commit:
 
@@ -397,15 +397,15 @@ feat(ai): add provenance-aware structured extraction
 
 ## M21 — AI Scribe Integration
 
-- [ ] Add AI doctor consult entry
-- [ ] Add AI nurse consult entry
-- [ ] Add AI patient session entry
-- [ ] Set author_role = system
-- [ ] Add source/session IDs
-- [ ] Add provenance
-- [ ] Add AI-SCRIBED UI badge
-- [ ] Add unverified status
-- [ ] Add clinician-confirmed status
+- [x] Add AI doctor consult entry
+- [x] Add AI nurse consult entry
+- [x] Add AI patient session entry
+- [x] Set author_role = system
+- [x] Add source/session IDs
+- [x] Add provenance
+- [x] Add AI-SCRIBED UI badge
+- [x] Add unverified status
+- [x] Add clinician-confirmed status
 
 Suggested commit:
 
@@ -417,25 +417,25 @@ feat(ai): integrate typed AI-scribed timeline entries
 
 ## M22 — Clinical Facts
 
-- [ ] Normalize allergy facts
-- [ ] Normalize medication facts
-- [ ] Normalize dosage
-- [ ] Normalize frequency
-- [ ] Link every fact to provenance
+- [x] Normalize allergy facts
+- [x] Normalize medication facts
+- [x] Normalize dosage
+- [x] Normalize frequency
+- [x] Link every fact to provenance
 
 ---
 
 ## M23 — Conflict Detection
 
-- [ ] Detect allergy contradiction
-- [ ] Detect medication contradiction
-- [ ] Detect dose contradiction
-- [ ] Detect frequency contradiction
-- [ ] Create fact conflict records
-- [ ] Preserve both sources
-- [ ] Add clinician review
-- [ ] Add resolution metadata
-- [ ] Add Needs Further Review state
+- [x] Detect allergy contradiction
+- [x] Detect medication contradiction
+- [x] Detect dose contradiction
+- [x] Detect frequency contradiction
+- [x] Create fact conflict records
+- [x] Preserve both sources
+- [x] Add clinician review
+- [x] Add resolution metadata
+- [x] Add Needs Further Review state
 
 Suggested commit:
 

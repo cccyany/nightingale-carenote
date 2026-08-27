@@ -141,6 +141,61 @@ export default async function PatientPage({
         </section>
 
         <aside className="space-y-4">
+          <section className="rounded-md border border-stone-300 bg-white p-4">
+            <h2 className="text-lg font-semibold">Clinical intelligence</h2>
+            <div className="mt-3 space-y-3 text-sm">
+              <div>
+                <h3 className="font-semibold">Open conflicts</h3>
+                {result.factConflicts.length ? (
+                  <div className="mt-2 space-y-2">
+                    {result.factConflicts.map((conflict) => (
+                      <div className="rounded border border-red-200 bg-red-50 p-2" key={conflict.id}>
+                        <div className="flex flex-wrap gap-2">
+                          <strong>{conflict.conflict_type}</strong>
+                          <span>{conflict.status}</span>
+                        </div>
+                        <p className="mt-1 text-xs text-stone-700">Both conflicting facts remain stored and traceable for review.</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-1 text-stone-600">No unresolved conflicts.</p>
+                )}
+              </div>
+              <div>
+                <h3 className="font-semibold">Extracted facts</h3>
+                <div className="mt-2 space-y-2">
+                  {result.clinicalFacts.slice(0, 6).map((fact) => (
+                    <div className="rounded border border-stone-200 p-2" key={fact.id}>
+                      <div className="flex flex-wrap gap-2">
+                        <span>{fact.entity_type}</span>
+                        <strong>{fact.normalized_entity}</strong>
+                        <span>{fact.assertion}</span>
+                      </div>
+                      <p className="text-xs text-stone-600">
+                        {fact.review_status}; evidence {Number(fact.evidence_confidence).toFixed(2)}; {fact.authority_role}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <h3 className="font-semibold">Patient-facing gate</h3>
+                {result.patientFacingContent.length ? (
+                  <div className="mt-2 space-y-2">
+                    {result.patientFacingContent.map((item) => (
+                      <div className="rounded border border-stone-200 p-2" key={item.id}>
+                        <strong>{item.title}</strong>
+                        <p className="text-xs text-stone-600">{item.status}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-1 text-stone-600">No generated patient-facing drafts.</p>
+                )}
+              </div>
+            </div>
+          </section>
           <NoteComposer patientId={id} />
           <TaskComposer patientId={id} users={assignableUsers} />
           <section className="rounded-md border border-stone-300 bg-white p-4">

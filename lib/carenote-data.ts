@@ -71,6 +71,35 @@ export type GlanceItem = {
     provenance_sources: { source_label: string } | null;
   } | null;
 };
+export type ClinicalFact = {
+  id: string;
+  entity_type: string;
+  normalized_entity: string;
+  value: string | null;
+  unit: string | null;
+  assertion: string;
+  authority_role: string;
+  evidence_confidence: number;
+  review_status: string;
+  provenance_span_id: string;
+};
+export type FactConflict = {
+  id: string;
+  conflict_type: string;
+  status: string;
+  fact_a_id: string;
+  fact_b_id: string;
+  created_at: string;
+};
+export type PatientFacingContent = {
+  id: string;
+  title: string;
+  body: string;
+  status: string;
+  provenance_span_id: string | null;
+  approved_at: string | null;
+  created_at: string;
+};
 export type AssignableUser = {
   profile_id: string;
   role: string;
@@ -132,6 +161,9 @@ export async function getPatientCareNote(patientId: string, filter: TimelineFilt
   comments: CareNoteComment[];
   tasks: CareNoteTask[];
   glanceItems: GlanceItem[];
+  clinicalFacts: ClinicalFact[];
+  factConflicts: FactConflict[];
+  patientFacingContent: PatientFacingContent[];
 }> {
   const supabase = createSupabaseAdminClient();
   const { data: patient, error: patientError } = await supabase
@@ -160,7 +192,10 @@ export async function getPatientCareNote(patientId: string, filter: TimelineFilt
     { data: entries, error: entriesError },
     { data: comments, error: commentsError },
     { data: tasks, error: tasksError },
-    { data: glanceItems, error: glanceError }
+    { data: glanceItems, error: glanceError },
+    { data: clinicalFacts, error: factsError },
+    { data: factConflicts, error: conflictsError },
+    { data: patientFacingContent, error: patientContentError }
   ] =
     await Promise.all([
       query,
@@ -180,20 +215,44 @@ export async function getPatientCareNote(patientId: string, filter: TimelineFilt
         .eq("patient_id", patientId)
         .neq("status", "rejected")
         .order("importance_score", { ascending: false })
-        .limit(5)
+        .limit(5),
+      supabase
+        .from("clinical_facts")
+        .select("id, entity_type, normalized_entity, value, unit, assertion, authority_role, evidence_confidence, review_status, provenance_span_id")
+        .eq("patient_id", patientId)
+        .order("created_at", { ascending: false })
+        .limit(12),
+      supabase
+        .from("fact_conflicts")
+        .select("id, conflict_type, status, fact_a_id, fact_b_id, created_at")
+        .eq("patient_id", patientId)
+        .order("created_at", { ascending: false })
+        .limit(8),
+      supabase
+        .from("patient_facing_content")
+        .select("id, title, body, status, provenance_span_id, approved_at, created_at")
+        .eq("patient_id", patientId)
+        .order("created_at", { ascending: false })
+        .limit(8)
     ]);
 
   if (entriesError) throw entriesError;
   if (commentsError) throw commentsError;
   if (tasksError) throw tasksError;
   if (glanceError) throw glanceError;
+  if (factsError) throw factsError;
+  if (conflictsError) throw conflictsError;
+  if (patientContentError) throw patientContentError;
 
   return {
     patient: normalizeRelations(patient) as unknown as CareNotePatient,
     entries: (entries ?? []).map((entry) => normalizeRelations(entry) as unknown as CareNoteEntry),
     comments: (comments ?? []).map((comment) => normalizeRelations(comment) as unknown as CareNoteComment),
     tasks: (tasks ?? []).map((task) => normalizeRelations(task) as unknown as CareNoteTask),
-    glanceItems: (glanceItems ?? []).map((item) => normalizeRelations(item) as unknown as GlanceItem)
+    glanceItems: (glanceItems ?? []).map((item) => normalizeRelations(item) as unknown as GlanceItem),
+    clinicalFacts: (clinicalFacts ?? []) as ClinicalFact[],
+    factConflicts: (factConflicts ?? []) as FactConflict[],
+    patientFacingContent: (patientFacingContent ?? []) as PatientFacingContent[]
   };
 }
 

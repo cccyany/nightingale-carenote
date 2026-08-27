@@ -145,7 +145,7 @@ begin
   on conflict (id) do update set source_version_id = excluded.source_version_id;
 
   insert into provenance_spans (id, source_id, entry_id, entry_version_id, char_start, char_end, evidence_text)
-  values ('71000000-0000-0000-0000-000000000001', '70000000-0000-0000-0000-000000000001', allergy_entry, allergy_version, 0, 31, 'Penicillin allergy documented.')
+  values ('71000000-0000-0000-0000-000000000001', '70000000-0000-0000-0000-000000000001', allergy_entry, allergy_version, 0, 30, 'Penicillin allergy documented.')
   on conflict (id) do update set entry_version_id = excluded.entry_version_id;
   insert into provenance_spans (id, source_id, entry_id, entry_version_id, char_start, char_end, evidence_text)
   values ('71000000-0000-0000-0000-000000000002', '70000000-0000-0000-0000-000000000002', nurse_entry, nurse_version, 16, 39, 'no known drug allergies')
