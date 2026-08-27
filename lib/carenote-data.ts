@@ -47,6 +47,30 @@ export type CareNoteTask = {
   created_at: string;
   profiles: DisplayProfile;
 };
+export type GlanceItem = {
+  id: string;
+  highlight_id: string | null;
+  title: string;
+  short_summary: string;
+  status: string;
+  risk: string;
+  risk_reason: string;
+  importance_score: number;
+  importance_reasons: Record<string, number>;
+  provenance_span_id: string;
+  available_action: string;
+  confirmation_status: string;
+  evidence_label: string;
+  evidence_explanation: string;
+  rule_key: string | null;
+  provenance_spans: {
+    entry_id: string | null;
+    char_start: number | null;
+    char_end: number | null;
+    evidence_text: string;
+    provenance_sources: { source_label: string } | null;
+  } | null;
+};
 export type AssignableUser = {
   profile_id: string;
   role: string;
@@ -107,6 +131,7 @@ export async function getPatientCareNote(patientId: string, filter: TimelineFilt
   entries: CareNoteEntry[];
   comments: CareNoteComment[];
   tasks: CareNoteTask[];
+  glanceItems: GlanceItem[];
 }> {
   const supabase = createSupabaseAdminClient();
   const { data: patient, error: patientError } = await supabase
@@ -131,7 +156,12 @@ export async function getPatientCareNote(patientId: string, filter: TimelineFilt
     query = query.eq("author_role", filter);
   }
 
-  const [{ data: entries, error: entriesError }, { data: comments, error: commentsError }, { data: tasks, error: tasksError }] =
+  const [
+    { data: entries, error: entriesError },
+    { data: comments, error: commentsError },
+    { data: tasks, error: tasksError },
+    { data: glanceItems, error: glanceError }
+  ] =
     await Promise.all([
       query,
       supabase
@@ -143,18 +173,27 @@ export async function getPatientCareNote(patientId: string, filter: TimelineFilt
         .from("tasks")
         .select("id, source_entry_id, title, assignee_id, status, due_date, created_at, profiles:assignee_id(display_name)")
         .eq("patient_id", patientId)
-        .order("created_at", { ascending: false })
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("glance_items")
+        .select("id, highlight_id, title, short_summary, status, risk, risk_reason, importance_score, importance_reasons, provenance_span_id, available_action, confirmation_status, evidence_label, evidence_explanation, rule_key, provenance_spans:provenance_span_id(entry_id, char_start, char_end, evidence_text, provenance_sources:source_id(source_label))")
+        .eq("patient_id", patientId)
+        .neq("status", "rejected")
+        .order("importance_score", { ascending: false })
+        .limit(5)
     ]);
 
   if (entriesError) throw entriesError;
   if (commentsError) throw commentsError;
   if (tasksError) throw tasksError;
+  if (glanceError) throw glanceError;
 
   return {
     patient: normalizeRelations(patient) as unknown as CareNotePatient,
     entries: (entries ?? []).map((entry) => normalizeRelations(entry) as unknown as CareNoteEntry),
     comments: (comments ?? []).map((comment) => normalizeRelations(comment) as unknown as CareNoteComment),
-    tasks: (tasks ?? []).map((task) => normalizeRelations(task) as unknown as CareNoteTask)
+    tasks: (tasks ?? []).map((task) => normalizeRelations(task) as unknown as CareNoteTask),
+    glanceItems: (glanceItems ?? []).map((item) => normalizeRelations(item) as unknown as GlanceItem)
   };
 }
 

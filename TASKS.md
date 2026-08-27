@@ -261,13 +261,13 @@ feat(concurrency): add optimistic section locking
 
 ## M12 — Provenance Model
 
-- [ ] Implement provenance sources
-- [ ] Implement source spans
-- [ ] Store entry/version relationship
-- [ ] Store evidence text
-- [ ] Store character offsets
-- [ ] Support transcript timestamps
-- [ ] Implement provenance resolver
+- [x] Implement provenance sources
+- [x] Implement source spans
+- [x] Store entry/version relationship
+- [x] Store evidence text
+- [x] Store character offsets
+- [x] Support transcript timestamps
+- [x] Implement provenance resolver
 
 Suggested commit:
 
@@ -277,23 +277,23 @@ feat(provenance): add resolvable evidence spans
 
 ## M13 — Provenance Navigation
 
-- [ ] Add View Source button
-- [ ] Navigate to source entry
-- [ ] Scroll to exact timeline entry
-- [ ] Highlight exact evidence span
-- [ ] Support AI-scribed source navigation
+- [x] Add View Source button
+- [x] Navigate to source entry
+- [x] Scroll to exact timeline entry
+- [x] Highlight exact evidence span
+- [x] Support AI-scribed source navigation
 
 ---
 
 ## M14 — Provenance Tests
 
-- [ ] Implement tests/test_highlight_provenance.py
-- [ ] Generate highlight
-- [ ] Resolve provenance pointer
-- [ ] Assert source entry exists
-- [ ] Assert source version exists
-- [ ] Assert offsets are valid
-- [ ] Assert evidence text matches referenced span
+- [x] Implement tests/test_highlight_provenance.py
+- [x] Generate highlight
+- [x] Resolve provenance pointer
+- [x] Assert source entry exists
+- [x] Assert source version exists
+- [x] Assert offsets are valid
+- [x] Assert evidence text matches referenced span
 
 Definition of Done:
 
@@ -305,15 +305,15 @@ Every trusted highlight can prove its source.
 
 ## M15 — Care Glance
 
-- [ ] Build Glance View
-- [ ] Limit active items to approximately 3–5
-- [ ] Display title
-- [ ] Display short explanation
-- [ ] Display status
-- [ ] Display risk reason
-- [ ] Display evidence state
-- [ ] Display available action
-- [ ] Display View Source
+- [x] Build Glance View
+- [x] Limit active items to approximately 3–5
+- [x] Display title
+- [x] Display short explanation
+- [x] Display status
+- [x] Display risk reason
+- [x] Display evidence state
+- [x] Display available action
+- [x] Display View Source
 
 Suggested commit:
 
@@ -323,13 +323,13 @@ feat(glance): add actionable Care Glance
 
 ## M16 — Deterministic Risk
 
-- [ ] Implement allergy conflict risk floor
-- [ ] Implement medication conflict risk floor
-- [ ] Implement medication dose conflict risk floor
-- [ ] Implement critical unresolved task floor
-- [ ] Separate risk from importance
-- [ ] Add explainable risk reason
-- [ ] Ensure model cannot lower deterministic floor
+- [x] Implement allergy conflict risk floor
+- [x] Implement medication conflict risk floor
+- [x] Implement medication dose conflict risk floor
+- [x] Implement critical unresolved task floor
+- [x] Separate risk from importance
+- [x] Add explainable risk reason
+- [x] Ensure model cannot lower deterministic floor
 
 Suggested commit:
 
@@ -339,12 +339,12 @@ feat(safety): add deterministic clinical risk floors
 
 ## M17 — Evidence Confidence + Abstention
 
-- [ ] Implement evidence confidence semantics
-- [ ] Detect unresolved provenance
-- [ ] Detect ambiguous extraction
-- [ ] Implement needs-review state
-- [ ] Prevent unsupported candidate from becoming trusted fact
-- [ ] Display evidence explanation instead of decorative model confidence
+- [x] Implement evidence confidence semantics
+- [x] Detect unresolved provenance
+- [x] Detect ambiguous extraction
+- [x] Implement needs-review state
+- [x] Prevent unsupported candidate from becoming trusted fact
+- [x] Display evidence explanation instead of decorative model confidence
 
 ---
 

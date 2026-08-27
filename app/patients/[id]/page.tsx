@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CommentComposer, CommentResolveButton, EntryEditor, NoteComposer, TaskComposer, TaskStatusButton } from "@/components/CareNoteActions";
+import { EvidenceText } from "@/components/EvidenceText";
 import { filterForRole, getClinicAssignableUsers, getPatientCareNote } from "@/lib/carenote-data";
 
 const filters = [
@@ -24,13 +25,18 @@ export default async function PatientPage({
   searchParams
 }: {
   params: Promise<{ id: string }>;
-  searchParams?: Promise<{ filter?: string }>;
+  searchParams?: Promise<{ filter?: string; source?: string; span?: string }>;
 }) {
   const { id } = await params;
   const resolvedSearch = await searchParams;
   const filter = filterForRole(resolvedSearch?.filter ?? "all");
   const result = await getPatientCareNote(id, filter);
   const assignableUsers = await getClinicAssignableUsers(result.patient.clinic_id);
+  const sourceEntryId = resolvedSearch?.source;
+  const sourceSpanId = resolvedSearch?.span;
+  const sourceSpan = result.glanceItems.find(
+    (item) => item.provenance_span_id === sourceSpanId && item.provenance_spans?.entry_id === sourceEntryId
+  )?.provenance_spans;
   const commentsByEntry = new Map<string, typeof result.comments>();
   for (const comment of result.comments) {
     const bucket = commentsByEntry.get(comment.entry_id) ?? [];
@@ -49,6 +55,37 @@ export default async function PatientPage({
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_320px]">
         <section>
+          <section className="mb-6 rounded-md border border-teal-800 bg-white p-4">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-xl font-semibold">Care Glance</h2>
+              <span className="text-sm text-stone-600">Top {result.glanceItems.length} active items</span>
+            </div>
+            <div className="mt-3 grid gap-3">
+              {result.glanceItems.slice(0, 5).map((item, index) => (
+                <article className="rounded-md border border-stone-300 p-3" key={item.id}>
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
+                    <strong>#{index + 1} {item.title}</strong>
+                    <span className={`rounded px-2 py-0.5 ${item.risk === "high" || item.risk === "critical" ? "bg-red-100 text-red-800" : "bg-amber-100 text-amber-800"}`}>{item.risk.toUpperCase()}</span>
+                    <span className="rounded bg-stone-100 px-2 py-0.5">{item.status.toUpperCase()}</span>
+                    <span>{item.evidence_label}</span>
+                  </div>
+                  <p className="mt-2 text-sm">{item.short_summary}</p>
+                  <p className="mt-2 text-xs text-stone-600">Why: {item.risk_reason}</p>
+                  <p className="text-xs text-stone-600">Evidence: {item.evidence_explanation}</p>
+                  <p className="text-xs text-stone-600">Rank: score {item.importance_score}; {Object.entries(item.importance_reasons ?? {}).map(([key, value]) => `${key} +${value}`).join(", ")}</p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                    <span className="font-medium">{item.available_action}</span>
+                    {item.provenance_spans?.entry_id ? (
+                      <Link className="underline" href={`/patients/${id}?source=${item.provenance_spans.entry_id}&span=${item.provenance_span_id}#entry-${item.provenance_spans.entry_id}`}>
+                        View Source
+                      </Link>
+                    ) : null}
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+
           <nav className="flex flex-wrap gap-2">
             {filters.map(([value, label]) => (
               <Link
@@ -69,7 +106,10 @@ export default async function PatientPage({
                   {(currentDate = dateLabel(entry.occurred_at))}
                 </h2>
               ) : null}
-              <article className={`rounded-md border bg-white p-4 ${entry.author_role === "system" ? "border-amber-300" : "border-stone-300"}`}>
+              <article
+                className={`scroll-mt-6 rounded-md border bg-white p-4 ${entry.author_role === "system" ? "border-amber-300" : "border-stone-300"} ${sourceEntryId === entry.id ? "ring-2 ring-amber-400" : ""}`}
+                id={`entry-${entry.id}`}
+              >
                 <div className="flex flex-wrap items-center gap-2 text-sm text-stone-600">
                   <span>{timeLabel(entry.occurred_at)}</span>
                   <span className="rounded bg-stone-100 px-2 py-0.5">{entry.entry_type}</span>
@@ -78,7 +118,7 @@ export default async function PatientPage({
                   {entry.author_role === "system" ? <strong className="rounded bg-amber-100 px-2 py-0.5 text-amber-900">AI-SCRIBED · unverified</strong> : null}
                   <Link className="ml-auto underline" href={`/patients/${id}/history?entry=${entry.id}`}>History</Link>
                 </div>
-                <p className="mt-3 whitespace-pre-wrap">{entry.content}</p>
+                <EvidenceText content={entry.content} evidenceStart={sourceEntryId === entry.id ? sourceSpan?.char_start : null} evidenceEnd={sourceEntryId === entry.id ? sourceSpan?.char_end : null} />
                 {entry.author_role === "staff" || entry.author_role === "clinician" ? <EntryEditor entry={entry} /> : null}
                 <CommentComposer entryId={entry.id} users={assignableUsers} />
                 <div className="mt-3 space-y-2">

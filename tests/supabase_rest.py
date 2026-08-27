@@ -44,6 +44,9 @@ class SupabaseSession:
     def rpc(self, name: str, payload: dict[str, object]) -> tuple[int, object]:
         return self._request("POST", f"/rest/v1/rpc/{name}", payload)
 
+    def postgrest_insert(self, table: str, payload: dict[str, object]) -> tuple[int, object]:
+        return self._request("POST", f"/rest/v1/{table}", payload)
+
     def _request(self, method: str, path: str, payload: dict[str, object] | None = None) -> tuple[int, object]:
         body = None if payload is None else json.dumps(payload).encode()
         request = Request(

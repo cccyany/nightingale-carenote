@@ -1,0 +1,147 @@
+import uuid
+
+import pytest
+
+from tests.supabase_rest import service_session, sign_in
+
+
+pytestmark = pytest.mark.supabase_integration
+
+JANE_PATIENT_ID = "30000000-0000-0000-0000-000000000001"
+CLINIC_A_ID = "20000000-0000-0000-0000-000000000001"
+AI_NURSE_ENTRY_ID = "40000000-0000-0000-0000-000000000002"
+
+
+@pytest.fixture(scope="module")
+def service():
+    return service_session()
+
+
+@pytest.fixture(scope="module")
+def clinician_session():
+    return sign_in("clinician.a@example.test")
+
+
+def test_trusted_highlights_have_resolvable_exact_provenance(service) -> None:
+    status, highlights = service.get(
+        "highlights",
+        {"select": "id,title,provenance_span_id,state,evidence_confidence", "patient_id": f"eq.{JANE_PATIENT_ID}", "state": "in.(suggested,confirmed)"},
+    )
+    assert status == 200, highlights
+    assert highlights
+
+    for highlight in highlights:
+      status, resolution = service.rpc("validate_provenance_span", {"p_span_id": highlight["provenance_span_id"]})
+      assert status == 200, resolution
+      assert resolution["ok"] is True
+      assert resolution["entry_id"]
+      assert resolution["version_id"]
+      assert resolution["char_start"] >= 0
+      assert resolution["char_end"] > resolution["char_start"]
+      status, versions = service.get("entry_versions", {"select": "content", "id": f"eq.{resolution['version_id']}"})
+      assert status == 200, versions
+      content = versions[0]["content"]
+      assert content[resolution["char_start"]:resolution["char_end"]] == resolution["evidence_text"]
+
+
+def test_ai_scribed_highlight_provenance_resolves_to_ai_entry(service) -> None:
+    status, rows = service.get(
+        "glance_items",
+        {"select": "title,provenance_span_id,provenance_spans(entry_id,evidence_text)", "title": "eq.Allergy conflict"},
+    )
+    assert status == 200, rows
+    span = rows[0]["provenance_spans"]
+    if isinstance(span, list):
+        span = span[0]
+    assert span["entry_id"] == AI_NURSE_ENTRY_ID
+
+    status, resolution = service.rpc("validate_provenance_span", {"p_span_id": rows[0]["provenance_span_id"]})
+    assert status == 200, resolution
+    assert resolution["ok"] is True
+    assert resolution["evidence_text"] == "no known drug allergies"
+
+
+def test_invalid_provenance_stays_needs_review_and_not_trusted(clinician_session, service) -> None:
+    status, entry = clinician_session.rpc(
+        "create_care_entry",
+        {
+            "p_patient_id": JANE_PATIENT_ID,
+            "p_entry_type": "clinician_note",
+            "p_visibility": "clinician_internal",
+            "p_content": f"Synthetic provenance base {uuid.uuid4()}.",
+        },
+    )
+    assert status == 200, entry
+    status, versions = service.get("entry_versions", {"select": "id", "entry_id": f"eq.{entry['id']}", "version_number": "eq.1"})
+    assert status == 200, versions
+    version_id = versions[0]["id"]
+
+    source_id = str(uuid.uuid4())
+    span_id = str(uuid.uuid4())
+    highlight_id = str(uuid.uuid4())
+    status, inserted_source = service.postgrest_insert("provenance_sources", {
+        "id": source_id,
+        "clinic_id": CLINIC_A_ID,
+        "patient_id": JANE_PATIENT_ID,
+        "source_entry_id": entry["id"],
+        "source_version_id": version_id,
+        "source_kind": "entry",
+        "source_label": "Synthetic invalid provenance source",
+    })
+    assert status in {200, 201}, inserted_source
+    status, inserted_span = service.postgrest_insert("provenance_spans", {
+        "id": span_id,
+        "source_id": source_id,
+        "entry_id": entry["id"],
+        "entry_version_id": version_id,
+        "char_start": 0,
+        "char_end": 9,
+        "evidence_text": "Mismatch",
+    })
+    assert status in {200, 201}, inserted_span
+    status, inserted_highlight = service.postgrest_insert("highlights", {
+        "id": highlight_id,
+        "clinic_id": CLINIC_A_ID,
+        "patient_id": JANE_PATIENT_ID,
+        "provenance_span_id": span_id,
+        "title": "Invalid provenance candidate",
+        "summary": "Synthetic unsupported candidate.",
+        "risk": "medium",
+        "risk_reason": "Unsupported provenance.",
+        "review_status": "needs_review",
+        "evidence_confidence": 0.50,
+        "state": "needs_review",
+        "confidence_explanation": "Evidence text does not match source span.",
+    })
+    assert status in {200, 201}, inserted_highlight
+
+    status, resolution = service.rpc("validate_provenance_span", {"p_span_id": span_id})
+    assert status == 200, resolution
+    assert resolution["ok"] is False
+    assert "does not match" in resolution["reason"]
+
+    status, rows = service.get("glance_items", {"select": "id", "highlight_id": f"eq.{highlight_id}"})
+    assert status == 200, rows
+    assert rows == []
+
+
+def test_deterministic_risk_floor_cannot_be_lowered(service) -> None:
+    status, risk = service.rpc("deterministic_risk_floor", {"p_rule_key": "ALLERGY_CONFLICT", "p_suggested": "low"})
+    assert status == 200, risk
+    assert risk == "high"
+
+    status, risk = service.rpc("deterministic_risk_floor", {"p_rule_key": "UNRESOLVED_TASK", "p_suggested": "low"})
+    assert status == 200, risk
+    assert risk == "medium"
+
+
+def test_unsupported_or_ambiguous_evidence_abstains_from_active_glance(service) -> None:
+    status, rows = service.get(
+        "highlights",
+        {"select": "id,state,evidence_confidence,confidence_explanation", "state": "eq.needs_review", "evidence_confidence": "lt.0.75"},
+    )
+    assert status == 200, rows
+    for row in rows:
+        status, glance = service.get("glance_items", {"select": "id", "highlight_id": f"eq.{row['id']}"})
+        assert status == 200, glance
+        assert glance == []

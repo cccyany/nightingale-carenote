@@ -67,7 +67,10 @@ try {
       "create_comment",
       "set_comment_resolved",
       "create_task",
-      "set_task_status"
+      "set_task_status",
+      "validate_provenance_span",
+      "deterministic_risk_floor",
+      "seed_jane_trust_glance"
     ]]
   );
 
