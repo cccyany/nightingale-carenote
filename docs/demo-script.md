@@ -89,9 +89,9 @@ Mention, do not benchmark live unless useful:
 - measured requests: 50
 - concurrency: 1
 - network included
-- P50: 153.55 ms
-- P95: 253.12 ms
-- P99: 436.82 ms
+- median P95 across five consecutive runs: 193.11 ms
+- individual-run P95 range: 173.04-210.86 ms
+- last run: P50 149.37 ms, P95 196.78 ms, P99 402.57 ms
 - target: P95 <= 300 ms
 
 End with: AI proposes. Humans verify. Provenance proves.

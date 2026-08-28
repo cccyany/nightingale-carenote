@@ -160,15 +160,15 @@ Benchmark command:
 npm.cmd run benchmark:glance
 ```
 
-Latest measured warm Supabase/PostgREST path in `docs/performance/glance-benchmark.json`:
+Latest measured warm Supabase/PostgREST path in `docs/performance/glance-benchmark.json`; representative value uses the median P95 across five consecutive runs:
 
 - warm-up requests: 10
 - measured requests: 50
 - concurrency: 1
 - network included: yes
-- P50: 153.55 ms
-- P95: 253.12 ms
-- P99: 436.82 ms
+- median P95 across 5 runs: 193.11 ms
+- individual-run P95 range: 173.04-210.86 ms
+- last run: P50 149.37 ms, P95 196.78 ms, P99 402.57 ms
 - failures: 0
 - target: P95 <= 300 ms
 - result: target met

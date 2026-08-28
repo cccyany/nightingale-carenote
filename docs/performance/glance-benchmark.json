@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-28T03:47:21.052Z",
+  "generated_at": "2026-08-28T04:18:58.518Z",
   "environment": "direct Supabase PostgREST from local benchmark script",
   "endpoint": "POST /rest/v1/rpc/read_patient_glance persisted warm read",
   "patient_id": "30000000-0000-0000-0000-000000000001",
@@ -9,28 +9,73 @@
   "includes_network_latency": true,
   "warm_path_has_llm_call": false,
   "warm_path_has_extraction": false,
-  "auth_token_ms": 451.24,
+  "auth_token_ms": 564.17,
   "nextjs_route_measured": false,
   "nextjs_route_note": "This benchmark measures the Supabase/PostgREST warm read path used by the Next.js route; it does not start a local Next.js server.",
   "secondary_reads": "none on warm Glance read; provenance pointers are returned without hydration",
   "failures": 0,
-  "p50_ms": 153.55,
-  "p95_ms": 253.12,
-  "p99_ms": 436.82,
+  "p50_ms": 149.37,
+  "p95_ms": 196.78,
+  "p99_ms": 402.57,
   "direct_database_rpc_ms": {
     "measured_requests": 50,
     "warmup_requests": 10,
-    "p50_ms": 329.6,
-    "p95_ms": 434.04,
-    "p99_ms": 820.53,
+    "p50_ms": 320.07,
+    "p95_ms": 358.84,
+    "p99_ms": 369.87,
     "note": "Direct pooler timing includes multiple client-server round trips: begin, auth claim setup, RPC select, rollback.",
     "database_execution_ms_from_explain_analyze": {
       "samples": 10,
-      "p50_ms": 0.43,
-      "p95_ms": 1.11,
-      "p99_ms": 1.11
+      "p50_ms": 0.41,
+      "p95_ms": 0.45,
+      "p99_ms": 0.45
     }
   },
   "target_p95_ms": 300,
-  "target_met": true
+  "target_met": true,
+  "five_run_summary": {
+    "measured_at": "2026-08-28T04:18:58.518Z",
+    "note": "Five consecutive warm-path benchmark runs. Representative result is median P95; individual-run rows preserve variance instead of selecting only the fastest run.",
+    "median_p95_ms": 193.11,
+    "p95_min_ms": 173.04,
+    "p95_max_ms": 210.86,
+    "all_runs_target_met": true,
+    "runs": [
+      {
+        "run": 1,
+        "p50_ms": 152.88,
+        "p95_ms": 185.23,
+        "p99_ms": 189.17,
+        "failures": 0
+      },
+      {
+        "run": 2,
+        "p50_ms": 144.96,
+        "p95_ms": 173.04,
+        "p99_ms": 410.81,
+        "failures": 0
+      },
+      {
+        "run": 3,
+        "p50_ms": 147.81,
+        "p95_ms": 210.86,
+        "p99_ms": 382.99,
+        "failures": 0
+      },
+      {
+        "run": 4,
+        "p50_ms": 153,
+        "p95_ms": 193.11,
+        "p99_ms": 250.82,
+        "failures": 0
+      },
+      {
+        "run": 5,
+        "p50_ms": 149.37,
+        "p95_ms": 196.78,
+        "p99_ms": 402.57,
+        "failures": 0
+      }
+    ]
+  }
 }

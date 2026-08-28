@@ -22,8 +22,7 @@ const filters = [
   ["ai", "AI Scribe"],
   ["clinician", "Clinician"],
   ["staff", "Staff"],
-  ["patient", "Patient"],
-  ["system", "System"]
+  ["patient", "Patient"]
 ];
 
 function dateLabel(value: string) {

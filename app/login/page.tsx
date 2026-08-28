@@ -27,7 +27,7 @@ export default function LoginPage() {
       <header className="mx-auto max-w-5xl">
         <Link className="text-sm font-medium text-teal-800 hover:underline" href="/">Nightingale CareNote</Link>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight">Demo roles</h1>
-        <p className="mt-2 max-w-2xl text-stone-700">
+        <p className="mt-2 text-stone-700">
           Use these synthetic identities to move through the demo. Server authorization and Supabase RLS still enforce the real boundaries.
         </p>
       </header>

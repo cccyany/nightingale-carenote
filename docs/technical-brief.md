@@ -79,7 +79,7 @@ The gateway detects synthetic names, Singapore NRIC/FIN-like IDs, phone numbers,
 
 Deterministic trust logic remains separate from Gemini output: provenance validation, conflicts, risk floors, evidence-quality semantics, importance ranking, and patient approval are not delegated to the model. Raw AI Scribe entries are internal care-team content; patients can see only explicitly approved patient-facing content.
 
-Performance evidence: `npm.cmd run benchmark:glance` measures the warm Supabase/PostgREST read model with 10 warm-up requests and 50 measured requests at concurrency 1. Latest result: P50 153.55 ms, P95 253.12 ms, P99 436.82 ms, failures 0, network included, target met. The warm Glance read performs no LLM call.
+Performance evidence: `npm.cmd run benchmark:glance` measures the warm Supabase/PostgREST read model with 10 warm-up requests and 50 measured requests at concurrency 1. Five consecutive runs produced a median P95 of 193.11 ms with individual-run P95 range 173.04-210.86 ms, failures 0, network included, target met. The last run measured P50 149.37 ms, P95 196.78 ms, P99 402.57 ms. The warm Glance read performs no LLM call.
 
 Evaluation fixtures are synthetic and intentionally limited. Current fixture report: redaction recall 1.00 on 5 cases with 1 measurable false positive; extraction matched 7/9 expected candidates with 7 trusted provenance-resolvable candidates; abstention matched 2/2 expected cases; conflict behavior matched 6/6 deterministic cases. These results are prototype evidence, not clinical validation.
 
