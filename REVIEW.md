@@ -21,7 +21,7 @@ Critical fix made during audit:
 | # | Requirement | Classification | Evidence | Tests / Runtime Evidence | Risk or Caveat |
 |---|---|---|---|---|---|
 | 1 | Shared Care Note | PASS | `app/patients/[id]/page.tsx`, `lib/carenote-data.ts`, core schema in `001_foundation_security.sql` | `pytest` care/collaboration tests | Prototype UI, not EHR-integrated |
-| 2 | Under-10-second Glance | PASS | Care Glance top section in `app/patients/[id]/page.tsx` | Benchmark P95 197.7 ms in `docs/performance/glance-benchmark.json` | Direct Supabase/PostgREST warm path, not deployed browser RUM |
+| 2 | Under-10-second Glance | PASS | Care Glance top section in `app/patients/[id]/page.tsx` | Five-run benchmark median P95 193.11 ms, P95 range 173.04–210.86 ms, failures 0 in `docs/performance/glance-benchmark.json` | Direct Supabase/PostgREST warm path, not deployed browser RUM |
 | 3 | Actionability | PASS | Glance `available_action`, task controls, patient review controls | `tests/test_glance_read_model.py`, `tests/test_collaboration.py` | Actions are prototype workflows |
 | 4 | Longitudinal timeline | PASS | `care_entries`, page date separators, recent-first ordering | Seeded Jane timeline and page implementation | Recent-first chosen for consult workflow |
 | 5 | All required entry types | PASS | `entry_type` enum in `001_foundation_security.sql` and AI ingest validation | Supabase verify required schema/functions | Not every type is heavily seeded |
@@ -68,14 +68,14 @@ Critical fix made during audit:
 | 46 | Transcript provenance | PASS | provenance span timestamp fields | `tests/test_voice_capture.py` | Timestamp resolution is structural |
 | 47 | Concurrency behavior | PASS | `expected_version`, 409 route mapping | `tests/test_concurrent_edits.py` | Entry-level optimistic concurrency |
 | 48 | Deterministic conflict strategy | PASS | conflict SQL detection and deterministic risk floors | AI clinical tests | Scope limited to high-value classes |
-| 49 | P95 <=300ms | PASS | `docs/performance/glance-benchmark.json` | latest P95 197.7 ms, failures 0 | Local-to-remote PostgREST benchmark; not deployed app RUM |
+| 49 | P95 <=300ms | PASS | `docs/performance/glance-benchmark.json` | five consecutive P95 values 185.23, 173.04, 210.86, 193.11, 196.78 ms; median P95 193.11 ms; failures 0 | Local-to-remote PostgREST benchmark; not deployed app RUM |
 | 50 | Synthetic data only | PASS | seed/test data uses synthetic `.example.test` users and fake IDs | grep scan found no obvious secrets/real PHI | Synthetic names are intentionally present for redaction/demo |
 | 51 | TLS / encryption at rest assumptions/documentation | PARTIAL | README and brief now document hosting assumption | document audit | Repo cannot independently prove provider infrastructure encryption |
 | 52 | Names redacted pre-LLM | PASS | `lib/ai/redaction.ts`, safe gateway | `tests/test_redaction.py` | Synthetic name list plus unresolved-name heuristic |
 | 53 | IDs redacted pre-LLM | PASS | NRIC/FIN-like regex | `tests/test_redaction.py` | Prototype pattern coverage |
 | 54 | Phones redacted pre-LLM | PASS | Singapore phone regex | `tests/test_redaction.py` | Prototype pattern coverage |
 | 55 | Redaction evaluation | PASS | `eval/redaction_cases.json`, evaluation script/report | `npm.cmd run evaluate:fixtures` | Small synthetic fixture set |
-| 56 | Required micro-tests | PASS | required test files exist | `pytest` collected 57 and passed | Node test suite has no tests |
+| 56 | Required micro-tests | PASS | required test files exist | `pytest` 67 passed; `npm.cmd test` 17 passed | Required named pytest files and Node tests are present |
 | 57 | Self-learning test | PASS | `tests/test_self_learning_importance.py` | `pytest` passed | Uses real Supabase persistence |
 | 58 | Audit metadata-only | PASS | audit SQL metadata avoids note bodies/prompts | revision and AI tests inspect audit behavior | Audit review is pattern-based |
 | 59 | Patient-facing generation approval | PASS | draft/approval workflow and RLS | patient approval tests | Clinician/admin approval required |
@@ -132,7 +132,7 @@ Evidence from code/artifacts, not README alone:
 - Persisted model: `glance_items` table plus optimized RPC in `013_optimize_glance_read_authorization.sql`.
 - No LLM/extraction on read: benchmark artifact records `warm_path_has_llm_call: false` and `warm_path_has_extraction: false`; route imports no AI code.
 - Methodology: `scripts/benchmark-glance.mjs` uses 10 warm-up requests, 50 measured requests, concurrency 1, network included.
-- Latest result: P50 157.74 ms, P95 197.7 ms, P99 735.03 ms, failures 0.
+- Five-run result: P95 values 185.23, 173.04, 210.86, 193.11, and 196.78 ms; median P95 193.11 ms; P95 range 173.04–210.86 ms; failures 0; all runs below the 300 ms target. The last run measured P50 149.37 ms, P95 196.78 ms, and P99 402.57 ms.
 
 ## Final Verification Evidence
 
@@ -142,11 +142,11 @@ Final validation was run after critical fixes:
 - `npm.cmd run supabase:verify`: PASS; missingTables `[]`, missingRls `[]`, constraintCount 269, indexCount 46, policyCount 39.
 - `npm.cmd run lint`: PASS.
 - `npm.cmd run typecheck`: PASS.
-- `npm.cmd test`: PASS; command completed with 0 Node tests discovered.
-- `pytest`: PASS; 57 passed, 1 pytest cache warning.
+- `npm.cmd test`: PASS; 17 passed.
+- `pytest`: PASS; 67 passed, 1 pytest cache warning.
 - `npm.cmd run build`: PASS.
 - `npm.cmd run evaluate:fixtures`: PASS; report generated with synthetic fixture metrics.
-- `npm.cmd run benchmark:glance`: PASS; P95 197.7 ms, failures 0, target met.
+- `npm.cmd run benchmark:glance`: PASS; five consecutive runs all below 300 ms, median P95 193.11 ms, P95 range 173.04–210.86 ms, failures 0, target met.
 
 ## Remaining PARTIAL Items
 

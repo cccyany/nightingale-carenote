@@ -20,12 +20,13 @@ Target length: 6 to 8 minutes.
 
 1. Enter through the Clinic A staff or clinician demo role.
 2. Open Jane Tan.
-3. Pause on Care Glance. It should be readable in under 10 seconds with the allergy conflict, renal-panel action, and persistent cough.
+3. Pause on Care Glance. It defaults to the top 3 presentable active items and can expand to at most 5; Jane currently has 5 presentable active items.
 4. Explain: risk is severity; importance is what the team should see first right now.
 5. Open the allergy conflict.
 6. Click View Source and show the page jumping to the exact source entry/evidence span.
 7. Call out that the source-of-truth remains the longitudinal timeline.
 8. Point to evidence wording: strong/supporting evidence plus conflicting sources means it still needs clinician review.
+9. If demonstrating live AI Scribe, show that the timeline card displays the full generated summary and keeps key points inside AI details.
 
 ## Scenario B: Collaboration and Audit
 
@@ -90,7 +91,7 @@ Mention, do not benchmark live unless useful:
 - concurrency: 1
 - network included
 - median P95 across five consecutive runs: 193.11 ms
-- individual-run P95 range: 173.04-210.86 ms
+- individual-run P95 range: 173.04–210.86 ms
 - last run: P50 149.37 ms, P95 196.78 ms, P99 402.57 ms
 - target: P95 <= 300 ms
 

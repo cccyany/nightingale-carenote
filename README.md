@@ -28,6 +28,10 @@ Jane Tan is the golden demo patient in Clinic A:
 
 The historical AI Scribe rows above are seeded synthetic fixtures for longitudinal context. To demonstrate live generation, open Jane as the clinician demo actor, expand `+ AI Scribe`, paste a synthetic transcript, and click `Generate AI Summary`. That user-triggered flow calls Gemini when `GEMINI_API_KEY` is configured, persists a new unverified internal AI entry, and links it to the original synthetic transcript source.
 
+Care Glance defaults to the top 3 presentable active items and can expand to at most 5. Jane currently has 5 presentable active items after golden-demo artifact filtering. Runtime AI Scribe cards display the full generated summary, with key points and provider metadata under `AI details`.
+
+Visible care-team timeline filters are `All`, `AI Scribe`, `Clinician`, `Staff`, and `Patient`. The underlying `system` author role and backend filter support remain implemented for AI-scribed/system-generated records.
+
 Role switching is demo navigation only. Security is enforced server-side and by PostgreSQL Row Level Security.
 
 ## Architecture
@@ -167,7 +171,7 @@ Latest measured warm Supabase/PostgREST path in `docs/performance/glance-benchma
 - concurrency: 1
 - network included: yes
 - median P95 across 5 runs: 193.11 ms
-- individual-run P95 range: 173.04-210.86 ms
+- individual-run P95 range: 173.04–210.86 ms
 - last run: P50 149.37 ms, P95 196.78 ms, P99 402.57 ms
 - failures: 0
 - target: P95 <= 300 ms
