@@ -75,7 +75,12 @@ Required environment variables:
 - `SUPABASE_DB_URL` using the Supabase Session Pooler connection string
 - `GEMINI_API_KEY` to enable real Gemini generation on server-side AI-scribe flows
 - `GEMINI_MODEL`, default `gemini-3.5-flash`
-- optional legacy `LLM_PROVIDER_ENDPOINT` / `LLM_PROVIDER_API_KEY`; the app works with deterministic/mock providers without a paid key
+
+Optional environment variables:
+
+- `LLM_PROVIDER_ENDPOINT` / `LLM_PROVIDER_API_KEY` for the legacy generic HTTP LLM provider fallback, used only when `GEMINI_API_KEY` is absent and both values are set
+
+Demo actor tokens such as `demo-clinician` and `demo-patient` are built-in synthetic navigation values, not environment variables.
 
 ## Validation Commands
 
