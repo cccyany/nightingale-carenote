@@ -1,5 +1,6 @@
 export type TranscriptSegment = {
   speaker: "patient" | "clinician" | "staff" | "unknown";
+  display_speaker?: string;
   start_ms: number;
   end_ms: number;
   text: string;
@@ -15,10 +16,14 @@ export class DeterministicTranscriptionProvider implements TranscriptionProvider
   async transcribe(input: { syntheticTranscriptText: string }): Promise<TranscriptSegment[]> {
     const parts = input.syntheticTranscriptText.split(/\n+/).filter(Boolean);
     return parts.map((part, index) => {
-      const speakerMatch = /^(patient|clinician|staff|unknown):\s*/i.exec(part);
-      const text = part.replace(/^(patient|clinician|staff|unknown):\s*/i, "");
+      const speakerMatch = /^(doctor|clinician|nurse|patient|staff|unknown):\s*/i.exec(part);
+      const label = speakerMatch?.[1]?.toLowerCase();
+      const speaker = label === "doctor" ? "clinician" : label === "nurse" ? "staff" : label;
+      const displaySpeaker = label ? label.charAt(0).toUpperCase() + label.slice(1) : "unknown";
+      const text = part.replace(/^(doctor|clinician|nurse|patient|staff|unknown):\s*/i, "");
       return {
-        speaker: (speakerMatch?.[1]?.toLowerCase() as TranscriptSegment["speaker"]) ?? "unknown",
+        speaker: (speaker as TranscriptSegment["speaker"]) ?? "unknown",
+        display_speaker: displaySpeaker,
         start_ms: index * 5000,
         end_ms: index * 5000 + Math.max(1000, text.length * 40),
         text,
@@ -30,5 +35,5 @@ export class DeterministicTranscriptionProvider implements TranscriptionProvider
 }
 
 export function transcriptText(segments: TranscriptSegment[]) {
-  return segments.map((segment) => `${segment.speaker}: ${segment.text}`).join("\n");
+  return segments.map((segment) => `${segment.display_speaker ?? segment.speaker}: ${segment.text}`).join("\n");
 }

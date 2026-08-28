@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAiScribePermission } from "@/lib/ai/authorization";
 import { invokeSafeLlm } from "@/lib/ai/safe-gateway";
-import { buildAiScribeContent, transcriptEvidenceSpan } from "@/lib/ai/scribe";
+import { buildAiScribeContent, parseAiScribeTranscript, transcriptEvidenceSpan, transcriptTimestampForEvidence } from "@/lib/ai/scribe";
 import { bearerToken, jsonError } from "@/lib/http";
 import { createSupabaseActorClient } from "@/lib/supabase/request";
 
@@ -25,7 +25,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
   const permission = await requireAiScribePermission(supabase, id);
   if (!permission.ok) return jsonError(permission.status, permission.message);
 
-  const sourceTranscript = `unknown: ${body.data.rawTranscript}`;
+  const parsedTranscript = parseAiScribeTranscript(body.data.rawTranscript);
+  const sourceTranscript = parsedTranscript.sourceTranscript;
   const gateway = await invokeSafeLlm(body.data.rawTranscript, "ai_scribe_structured_ingest");
   if (!gateway.ok) {
     return NextResponse.json(
@@ -37,14 +38,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
   const { data: session, error: transcriptError } = await supabase.rpc("create_transcript_session", {
     p_patient_id: id,
     p_source_label: body.data.sourceLabel,
-    p_segments: [{
-      speaker: "unknown",
-      start_ms: 0,
-      end_ms: Math.max(1000, body.data.rawTranscript.length * 40),
-      text: body.data.rawTranscript,
-      confidence: 0.85,
-      uncertain: false
-    }]
+    p_segments: parsedTranscript.segments
   });
   if (transcriptError) return jsonError(403, transcriptError.message);
 
@@ -64,6 +58,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
 
   if (error) return jsonError(403, error.message);
   const evidence = transcriptEvidenceSpan(sourceTranscript);
+  const timestamps = transcriptTimestampForEvidence(evidence.charStart, sourceTranscript, parsedTranscript.segments);
   const { data: provenanceSpanId, error: provenanceError } = await supabase.rpc("create_provenance_for_transcript_span", {
     p_entry_id: entryId,
     p_source_content: sourceTranscript,
@@ -72,8 +67,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     p_char_end: evidence.charEnd,
     p_source_label: body.data.sourceLabel,
     p_session_identifier: session.id,
-    p_transcript_start_ms: 0,
-    p_transcript_end_ms: Math.max(1000, body.data.rawTranscript.length * 40)
+    p_transcript_start_ms: timestamps.startMs,
+    p_transcript_end_ms: timestamps.endMs
   });
   if (provenanceError) return jsonError(409, "AI summary was generated but source provenance did not validate.");
 

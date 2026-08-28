@@ -16,6 +16,7 @@ import { EvidenceText } from "@/components/EvidenceText";
 import { getClinicAssignableUsers, getPatientCareNote, type CareNoteEntry } from "@/lib/carenote-data";
 import { isValidationNoiseText, presentableGlanceItems } from "@/lib/glance-presentation";
 import { filterForRole } from "@/lib/timeline-filters";
+import { transcriptSourceForDisplay } from "@/lib/ai/scribe";
 
 const filters = [
   ["all", "All"],
@@ -275,6 +276,9 @@ export default async function PatientPage({
                         const showHighlight = sourceEntryId === entry.id && !aiMeta;
                         const transcriptSpan = aiMeta ? firstTranscriptSpan(entry) : null;
                         const transcriptSource = transcriptSpan?.provenance_sources?.source_content ?? "";
+                        const transcriptDisplay = transcriptSpan
+                          ? transcriptSourceForDisplay(transcriptSource, transcriptSpan.char_start, transcriptSpan.char_end)
+                          : null;
                         return (
                           <article
                             className={`scroll-mt-24 rounded-md border p-4 ${entryTone(entry.author_role)} ${sourceEntryId === entry.id ? "ring-2 ring-amber-400" : ""}`}
@@ -320,7 +324,7 @@ export default async function PatientPage({
                                 <summary className="cursor-pointer font-semibold text-stone-800">Review source</summary>
                                 <p className="mt-2 text-stone-600">Source transcript. Highlighted text is exact source evidence; the generated summary remains needs verification.</p>
                                 <div className="mt-2 max-h-52 overflow-auto rounded border border-stone-200 bg-white p-3 text-sm leading-6 text-stone-800">
-                                  <EvidenceText content={transcriptSource} evidenceStart={transcriptSpan.char_start} evidenceEnd={transcriptSpan.char_end} />
+                                  <EvidenceText content={transcriptDisplay?.content ?? transcriptSource} evidenceStart={transcriptDisplay?.evidenceStart} evidenceEnd={transcriptDisplay?.evidenceEnd} />
                                 </div>
                                 {transcriptSpan.transcript_start_ms !== null && transcriptSpan.transcript_end_ms !== null ? (
                                   <p className="mt-2 text-stone-600">Transcript segment: {transcriptSpan.transcript_start_ms}ms-{transcriptSpan.transcript_end_ms}ms</p>

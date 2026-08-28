@@ -75,7 +75,7 @@ Critical fix made during audit:
 | 53 | IDs redacted pre-LLM | PASS | NRIC/FIN-like regex | `tests/test_redaction.py` | Prototype pattern coverage |
 | 54 | Phones redacted pre-LLM | PASS | Singapore phone regex | `tests/test_redaction.py` | Prototype pattern coverage |
 | 55 | Redaction evaluation | PASS | `eval/redaction_cases.json`, evaluation script/report | `npm.cmd run evaluate:fixtures` | Small synthetic fixture set |
-| 56 | Required micro-tests | PASS | required test files exist | `pytest` 67 passed; `npm.cmd test` 17 passed | Required named pytest files and Node tests are present |
+| 56 | Required micro-tests | PASS | required test files exist | `pytest` 67 passed; `npm.cmd test` 21 passed | Required named pytest files and Node tests are present |
 | 57 | Self-learning test | PASS | `tests/test_self_learning_importance.py` | `pytest` passed | Uses real Supabase persistence |
 | 58 | Audit metadata-only | PASS | audit SQL metadata avoids note bodies/prompts | revision and AI tests inspect audit behavior | Audit review is pattern-based |
 | 59 | Patient-facing generation approval | PASS | draft/approval workflow and RLS | patient approval tests | Clinician/admin approval required |
@@ -142,7 +142,7 @@ Final validation was run after critical fixes:
 - `npm.cmd run supabase:verify`: PASS; missingTables `[]`, missingRls `[]`, constraintCount 269, indexCount 46, policyCount 39.
 - `npm.cmd run lint`: PASS.
 - `npm.cmd run typecheck`: PASS.
-- `npm.cmd test`: PASS; 17 passed.
+- `npm.cmd test`: PASS; 21 passed.
 - `pytest`: PASS; 67 passed, 1 pytest cache warning.
 - `npm.cmd run build`: PASS.
 - `npm.cmd run evaluate:fixtures`: PASS; report generated with synthetic fixture metrics.
