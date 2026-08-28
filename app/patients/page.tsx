@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AppShell, actorForDemo } from "@/components/AppShell";
+import { presentableGlanceItems } from "@/lib/glance-presentation";
 import { createSupabaseActorClient } from "@/lib/supabase/request";
 
 type GlanceSummary = {
@@ -10,17 +11,6 @@ type GlanceSummary = {
   risk_reason: string;
   rule_key: string | null;
 };
-
-const validationNoisePatterns = [
-  /\bSynthetic safety future\b/i,
-  /\bSynthetic staff-owned note\b/i,
-  /\bSynthetic first writer wins\b/i,
-  /\bSynthetic audit updated content\b/i,
-  /\bSynthetic revision base\b/i,
-  /\bSynthetic low trust draft\b/i,
-  /\bSynthetic provenance base\b/i,
-  /\bSynthetic extraction base\b/i
-];
 
 function firstName(value: { name: string } | { name: string }[] | null): string {
   if (Array.isArray(value)) return value[0]?.name ?? "Clinic";
@@ -47,31 +37,6 @@ function dateTimeLabel(value: string | null) {
     timeStyle: "short",
     timeZone: "Asia/Singapore"
   }).format(new Date(value));
-}
-
-function isValidationNoiseGlance(item: GlanceSummary) {
-  const text = `${item.title} ${item.short_summary} ${item.risk_reason}`;
-  return validationNoisePatterns.some((pattern) => pattern.test(text));
-}
-
-function glanceKey(item: GlanceSummary) {
-  const title = item.title.toLowerCase();
-  if (title.includes("allergy") && title.includes("conflict")) return "allergy_conflict";
-  if (title.includes("dose") && title.includes("conflict")) return "medication_dose_conflict";
-  if (title.includes("medication") && title.includes("conflict")) return "medication_conflict";
-  if (title.includes("renal")) return "renal_panel_action";
-  if (title.includes("cough")) return "persistent_cough";
-  return `${item.rule_key ?? "item"}:${title}`;
-}
-
-function dedupeGlance(items: GlanceSummary[]) {
-  const seen = new Set<string>();
-  return items.filter((item) => {
-    const key = glanceKey(item);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  }).slice(0, 5);
 }
 
 export default async function PatientsPage({
@@ -108,7 +73,7 @@ export default async function PatientsPage({
       supabase.from("glance_items").select("id, status, title, short_summary, risk_reason, rule_key").eq("patient_id", patient.id).neq("status", "rejected"),
       supabase.from("care_entries").select("occurred_at").eq("patient_id", patient.id).order("occurred_at", { ascending: false }).limit(1)
     ]);
-    const visibleGlance = dedupeGlance(((glanceRows ?? []) as GlanceSummary[]).filter((item) => !isValidationNoiseGlance(item)));
+    const visibleGlance = presentableGlanceItems((glanceRows ?? []) as GlanceSummary[]);
     return {
       patient,
       activeItems: visibleGlance.length,
@@ -123,7 +88,7 @@ export default async function PatientsPage({
         <header>
           <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Role-authenticated workspace</p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">Patients</h1>
-          <p className="mt-2 max-w-2xl text-stone-700">
+          <p className="mt-2 text-stone-700">
             {actor?.clinicName === "Clinic B"
               ? "The list below is scoped to the Clinic B demo actor by server authorization and Supabase RLS."
               : "The list below is scoped by the signed-in demo actor and Supabase RLS. Clinic A contains the primary golden demo record."}

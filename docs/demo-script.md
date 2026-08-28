@@ -89,7 +89,9 @@ Mention, do not benchmark live unless useful:
 - measured requests: 50
 - concurrency: 1
 - network included
-- P95: 197.7 ms
+- P50: 153.55 ms
+- P95: 253.12 ms
+- P99: 436.82 ms
 - target: P95 <= 300 ms
 
 End with: AI proposes. Humans verify. Provenance proves.

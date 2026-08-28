@@ -1,4 +1,5 @@
 import { createSupabaseActorClient } from "@/lib/supabase/request";
+import { isValidationNoiseText, presentableGlanceItems, validationNoiseSqlLikePatterns } from "./glance-presentation";
 import { applyTimelineEntryFilter, type TimelineFilter } from "./timeline-filters";
 
 type RelationObject = Record<string, unknown> | null;
@@ -219,6 +220,9 @@ export async function getPatientCareNote(patientId: string, filter: TimelineFilt
     .order("occurred_at", { ascending: false });
 
   query = applyTimelineEntryFilter(query, filter);
+  for (const pattern of validationNoiseSqlLikePatterns) {
+    query = query.not("content", "ilike", pattern);
+  }
 
   const [
     { data: entries, error: entriesError },
@@ -236,18 +240,20 @@ export async function getPatientCareNote(patientId: string, filter: TimelineFilt
         .select("id, entry_id, parent_comment_id, author_id, body, resolved_at, resolved_by, created_at, profiles:author_id(display_name), comment_mentions(mentioned_profile_id, profiles:mentioned_profile_id(display_name))")
         .eq("patient_id", patientId)
         .order("created_at", { ascending: true }),
-      supabase
+      validationNoiseSqlLikePatterns.reduce(
+        (taskQuery, pattern) => taskQuery.not("title", "ilike", pattern),
+        supabase
         .from("tasks")
         .select("id, source_entry_id, title, assignee_id, status, due_date, created_at, profiles:assignee_id(display_name)")
         .eq("patient_id", patientId)
-        .order("created_at", { ascending: false }),
+        .order("created_at", { ascending: false })
+      ),
       supabase
         .from("glance_items")
         .select("id, highlight_id, title, short_summary, status, risk, risk_reason, importance_score, importance_reasons, storage_class, ranking_explanation, provenance_span_id, available_action, confirmation_status, evidence_label, evidence_explanation, rule_key, provenance_spans:provenance_span_id(entry_id, char_start, char_end, evidence_text, provenance_sources:source_id(source_label))")
         .eq("patient_id", patientId)
         .neq("status", "rejected")
-        .order("importance_score", { ascending: false })
-        .limit(5),
+        .order("importance_score", { ascending: false }),
       supabase
         .from("clinical_facts")
         .select("id, entity_type, normalized_entity, value, unit, assertion, authority_role, evidence_confidence, review_status, provenance_span_id, provenance_spans:provenance_span_id(entry_id)")
@@ -260,12 +266,15 @@ export async function getPatientCareNote(patientId: string, filter: TimelineFilt
         .eq("patient_id", patientId)
         .order("created_at", { ascending: false })
         .limit(8),
-      supabase
+      validationNoiseSqlLikePatterns.reduce(
+        (contentQuery, pattern) => contentQuery.not("title", "ilike", pattern).not("body", "ilike", pattern),
+        supabase
         .from("patient_facing_content")
         .select("id, title, body, status, provenance_span_id, approved_at, created_at, review_status, evidence_confidence")
         .eq("patient_id", patientId)
         .order("created_at", { ascending: false })
         .limit(8)
+      )
     ]);
 
   if (entriesError) throwSupabaseError("getPatientCareNote.entries", entriesError);
@@ -276,15 +285,23 @@ export async function getPatientCareNote(patientId: string, filter: TimelineFilt
   if (conflictsError) throwSupabaseError("getPatientCareNote.factConflicts", conflictsError);
   if (patientContentError) throwSupabaseError("getPatientCareNote.patientFacingContent", patientContentError);
 
+  const cleanEntries = (entries ?? []).filter((entry) => !isValidationNoiseText(String(entry.content ?? "")));
+  const cleanTasks = (tasks ?? []).filter((task) => !/^Synthetic collaboration follow-up\b/i.test(String(task.title ?? "").trim()));
+  const cleanGlanceItems = presentableGlanceItems((glanceItems ?? []) as unknown as GlanceItem[]);
+  const cleanClinicalFacts = (clinicalFacts ?? []).filter((fact) => !isValidationNoiseText(JSON.stringify(fact)));
+  const cleanFactIds = new Set(cleanClinicalFacts.map((fact) => fact.id));
+  const cleanFactConflicts = (factConflicts ?? []).filter((conflict) => cleanFactIds.has(conflict.fact_a_id) && cleanFactIds.has(conflict.fact_b_id));
+  const cleanPatientFacingContent = (patientFacingContent ?? []).filter((item) => !isValidationNoiseText(`${item.title} ${item.body}`));
+
   return {
     patient: normalizeRelations(patient) as unknown as CareNotePatient,
-    entries: (entries ?? []).map((entry) => normalizeRelations(entry) as unknown as CareNoteEntry),
+    entries: cleanEntries.map((entry) => normalizeRelations(entry) as unknown as CareNoteEntry),
     comments: (comments ?? []).map((comment) => normalizeRelations(comment) as unknown as CareNoteComment),
-    tasks: (tasks ?? []).map((task) => normalizeRelations(task) as unknown as CareNoteTask),
-    glanceItems: (glanceItems ?? []).map((item) => normalizeRelations(item) as unknown as GlanceItem),
-    clinicalFacts: (clinicalFacts ?? []).map((fact) => normalizeRelations(fact) as unknown as ClinicalFact),
-    factConflicts: (factConflicts ?? []) as FactConflict[],
-    patientFacingContent: (patientFacingContent ?? []) as PatientFacingContent[]
+    tasks: cleanTasks.map((task) => normalizeRelations(task) as unknown as CareNoteTask),
+    glanceItems: cleanGlanceItems.map((item) => normalizeRelations(item) as unknown as GlanceItem),
+    clinicalFacts: cleanClinicalFacts.map((fact) => normalizeRelations(fact) as unknown as ClinicalFact),
+    factConflicts: cleanFactConflicts as FactConflict[],
+    patientFacingContent: cleanPatientFacingContent as PatientFacingContent[]
   };
 }
 

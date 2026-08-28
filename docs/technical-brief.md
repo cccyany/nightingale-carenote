@@ -24,7 +24,7 @@ flowchart LR
 
 Warm read path: `/api/patients/[id]/glance` calls the persisted `read_patient_glance` RPC. It returns only precomputed Glance fields, uses existing Supabase Auth/RLS scope, and performs no LLM call or extraction.
 
-Write/AI path: notes, comments, tasks, patient-facing drafts, AI-scribed entries, transcript capture, facts, conflicts, and feedback write durable rows. Provenance spans and score components are computed before the warm consult read.
+Write/AI path: notes, comments, tasks, patient-facing drafts, AI-scribed entries, transcript capture, facts, conflicts, and feedback write durable rows. Runtime AI Scribe first authorizes the care-team actor, then redacts patient-derived text before the server-side Gemini 3.5 Flash provider call. Generated summaries remain unverified; provenance links the AI entry back to the original synthetic transcript/source span. Provenance spans and score components are computed before the warm consult read.
 
 Key scope choices: the prototype favors a small, auditable monolith; SQL constraints and RLS over application-only trust; structured extraction over free-form generation; and deterministic clinical rules over model-generated severity.
 
@@ -77,7 +77,9 @@ raw input -> redact -> verify -> provider.
 
 The gateway detects synthetic names, Singapore NRIC/FIN-like IDs, phone numbers, emails, and structured identifiers. It records metadata without original PHI and blocks high-risk calls when verification cannot establish a safe provider payload.
 
-Performance evidence: `npm.cmd run benchmark:glance` measures the warm Supabase/PostgREST read model with 10 warm-up requests and 50 measured requests at concurrency 1. Latest result: P50 157.74 ms, P95 197.7 ms, P99 735.03 ms, failures 0, network included, target met.
+Deterministic trust logic remains separate from Gemini output: provenance validation, conflicts, risk floors, evidence-quality semantics, importance ranking, and patient approval are not delegated to the model. Raw AI Scribe entries are internal care-team content; patients can see only explicitly approved patient-facing content.
+
+Performance evidence: `npm.cmd run benchmark:glance` measures the warm Supabase/PostgREST read model with 10 warm-up requests and 50 measured requests at concurrency 1. Latest result: P50 153.55 ms, P95 253.12 ms, P99 436.82 ms, failures 0, network included, target met. The warm Glance read performs no LLM call.
 
 Evaluation fixtures are synthetic and intentionally limited. Current fixture report: redaction recall 1.00 on 5 cases with 1 measurable false positive; extraction matched 7/9 expected candidates with 7 trusted provenance-resolvable candidates; abstention matched 2/2 expected cases; conflict behavior matched 6/6 deterministic cases. These results are prototype evidence, not clinical validation.
 

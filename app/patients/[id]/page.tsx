@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { AppShell, actorForDemo } from "@/components/AppShell";
+import { GlanceSection } from "@/components/GlanceSection";
 import {
   AiScribeComposer,
   CommentComposer,
   CommentResolveButton,
   EntryEditor,
-  HighlightFeedbackButtons,
   NoteComposer,
   PatientContentStatusButtons,
   ReplyComposer,
@@ -13,7 +13,8 @@ import {
   TaskStatusButton
 } from "@/components/CareNoteActions";
 import { EvidenceText } from "@/components/EvidenceText";
-import { getClinicAssignableUsers, getPatientCareNote, type CareNoteEntry, type GlanceItem } from "@/lib/carenote-data";
+import { getClinicAssignableUsers, getPatientCareNote, type CareNoteEntry } from "@/lib/carenote-data";
+import { isValidationNoiseText, presentableGlanceItems } from "@/lib/glance-presentation";
 import { filterForRole } from "@/lib/timeline-filters";
 
 const filters = [
@@ -23,17 +24,6 @@ const filters = [
   ["staff", "Staff"],
   ["patient", "Patient"],
   ["system", "System"]
-];
-
-const validationNoisePatterns = [
-  /\bSynthetic safety future\b/i,
-  /\bSynthetic staff-owned note\b/i,
-  /\bSynthetic first writer wins\b/i,
-  /\bSynthetic audit updated content\b/i,
-  /\bSynthetic revision base\b/i,
-  /\bSynthetic low trust draft\b/i,
-  /\bSynthetic provenance base\b/i,
-  /\bSynthetic extraction base\b/i
 ];
 
 function dateLabel(value: string) {
@@ -87,9 +77,12 @@ function parseAiContent(content: string) {
       generated?: string;
     };
     if (parsed && typeof parsed === "object" && typeof parsed.generated === "string") {
+      const generated = parseGeneratedSummary(parsed.generated);
       return {
-        body: renderGeneratedSummary(parsed.generated),
+        summary: generated.summary,
+        keyPoints: generated.keyPoints,
         provider: parsed.provider_display ?? parsed.model ?? null,
+        model: parsed.model ?? null,
         reviewState: parsed.review_state ?? "unverified",
         sourceLabel: parsed.source_label ?? null,
         sourceSessionIdentifier: parsed.source_session_identifier ?? null
@@ -101,7 +94,7 @@ function parseAiContent(content: string) {
   return null;
 }
 
-function renderGeneratedSummary(generated: string) {
+function parseGeneratedSummary(generated: string) {
   try {
     const parsed = JSON.parse(generated) as { summary?: unknown; key_points?: unknown };
     const summary = typeof parsed.summary === "string" ? parsed.summary.trim() : "";
@@ -109,21 +102,20 @@ function renderGeneratedSummary(generated: string) {
       ? parsed.key_points.filter((point): point is string => typeof point === "string" && Boolean(point.trim()))
       : [];
     if (summary || keyPoints.length) {
-      return [summary, ...keyPoints.map((point) => `- ${point.trim()}`)].filter(Boolean).join("\n");
+      return {
+        summary: summary || generated,
+        keyPoints: keyPoints.map((point) => point.trim())
+      };
     }
   } catch {
-    return generated;
+    return { summary: generated, keyPoints: [] };
   }
-  return generated;
+  return { summary: generated, keyPoints: [] };
 }
 
 function preview(content: string) {
   const text = content.replace(/\s+/g, " ").trim();
   return text.length > 240 ? `${text.slice(0, 237)}...` : text;
-}
-
-function isValidationNoiseText(text: string) {
-  return validationNoisePatterns.some((pattern) => pattern.test(text));
 }
 
 function isValidationNoiseEntry(entry: CareNoteEntry, sourceEntryId?: string) {
@@ -135,34 +127,10 @@ function isValidationNoiseTask(title: string) {
   return /^Synthetic collaboration follow-up\b/i.test(title.trim());
 }
 
-function isValidationNoiseGlance(item: GlanceItem) {
-  return isValidationNoiseText(`${item.title} ${item.short_summary} ${item.risk_reason}`);
-}
-
 function cleanDemoTitle(title: string) {
   if (title.startsWith("Synthetic patient approval")) return "Care instruction draft";
   if (title.startsWith("Synthetic approved summary")) return "Approved care summary";
   return title.replace(/\s+[0-9a-f-]{36}$/i, "");
-}
-
-function glanceKey(item: GlanceItem) {
-  const title = item.title.toLowerCase();
-  if (title.includes("allergy") && title.includes("conflict")) return "allergy_conflict";
-  if (title.includes("dose") && title.includes("conflict")) return "medication_dose_conflict";
-  if (title.includes("medication") && title.includes("conflict")) return "medication_conflict";
-  if (title.includes("renal")) return "renal_panel_action";
-  if (title.includes("cough")) return "persistent_cough";
-  return `${item.rule_key ?? "item"}:${title}`;
-}
-
-function dedupeGlance(items: GlanceItem[]) {
-  const seen = new Set<string>();
-  return items.filter((item) => {
-    const key = glanceKey(item);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  }).slice(0, 5);
 }
 
 function groupEntriesByDate(entries: CareNoteEntry[]) {
@@ -177,35 +145,6 @@ function groupEntriesByDate(entries: CareNoteEntry[]) {
     }
   }
   return groups;
-}
-
-function riskClass(risk: string) {
-  if (risk === "high" || risk === "critical") return "bg-red-700 text-white border-red-700";
-  if (risk === "medium") return "bg-amber-100 text-amber-950 border-amber-200";
-  return "bg-teal-50 text-teal-950 border-teal-100";
-}
-
-function humanRiskReason(reason: string) {
-  if (reason.includes("ALLERGY_CONFLICT")) return "Potential allergy contradiction. Safety rules keep this item high priority until reviewed.";
-  if (reason.includes("MEDICATION_DOSE_CONFLICT")) return "Medication dose information conflicts and needs clinician review.";
-  if (reason.includes("MEDICATION_CONFLICT")) return "Medication status conflicts and should be reconciled before acting.";
-  if (reason.includes("UNRESOLVED")) return "An open follow-up may affect near-term care.";
-  return reason;
-}
-
-function componentLabel(key: string) {
-  const labels: Record<string, string> = {
-    risk: "Clinical severity",
-    unresolved_action: "Unresolved action",
-    recency: "Recent evidence",
-    clinician_confirmation: "Clinician confirmed",
-    entity_priority: "Clinical topic priority",
-    decay: "Age/decay adjustment",
-    adaptive: "Care-team feedback",
-    final_score: "Final importance",
-    storage_class: "Recency tier"
-  };
-  return labels[key] ?? displayToken(key);
 }
 
 function factSummary(fact: { entity_type: string; normalized_entity: string; value: string | null; unit: string | null; assertion: string; authority_role: string } | undefined) {
@@ -262,9 +201,12 @@ export default async function PatientPage({
   const visiblePatientFacingContent = result.patientFacingContent.filter((item) => !isValidationNoiseText(`${item.title} ${item.body}`));
   const entryById = new Map(result.entries.map((entry) => [entry.id, entry]));
   const factById = new Map(result.clinicalFacts.map((fact) => [fact.id, fact]));
-  const visibleGlance = dedupeGlance(result.glanceItems.filter((item) => !isValidationNoiseGlance(item)));
-  const primaryGlance = visibleGlance.slice(0, 3);
-  const secondaryGlance = visibleGlance.slice(3);
+  const visibleFactConflicts = result.factConflicts.filter((conflict) => {
+    const factA = factById.get(conflict.fact_a_id);
+    const factB = factById.get(conflict.fact_b_id);
+    return !isValidationNoiseText(`${factSummary(factA)} ${factSummary(factB)}`);
+  });
+  const visibleGlance = presentableGlanceItems(result.glanceItems);
   const entryGroups = groupEntriesByDate(visibleEntries);
 
   return (
@@ -294,88 +236,7 @@ export default async function PatientPage({
           </div>
         </section>
 
-        <section className="mt-5 rounded-md border border-teal-800 bg-white p-4 shadow-sm">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Care Glance</p>
-              <h2 className="mt-1 text-2xl font-semibold tracking-tight">What needs attention now</h2>
-              <p className="mt-1 text-sm text-stone-600">Top ranked, source-linked items. The timeline remains the source of truth.</p>
-            </div>
-            <span className="rounded-full bg-teal-50 px-3 py-1 text-sm font-medium text-teal-900">{visibleGlance.length} active items - showing top {primaryGlance.length}</span>
-          </div>
-          <div className="mt-4 grid gap-3 lg:grid-cols-3">
-            {primaryGlance.length ? primaryGlance.map((item) => (
-              <article className={`rounded-md border p-4 shadow-sm ${item.risk === "high" || item.risk === "critical" ? "border-red-200 bg-red-50/60" : "border-stone-200 bg-white"}`} key={item.id}>
-                <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <span className={`rounded-full border px-2.5 py-1 font-semibold ${riskClass(item.risk)}`}>{item.risk.toUpperCase()}</span>
-                  <span className="rounded-full border border-stone-200 bg-white px-2.5 py-1 font-medium text-stone-700">{displayToken(item.status)}</span>
-                </div>
-                <h3 className="mt-3 text-lg font-semibold leading-snug">{item.title}</h3>
-                <p className="mt-2 text-sm leading-6 text-stone-800">{item.short_summary}</p>
-                <dl className="mt-3 space-y-3 text-sm">
-                  <div>
-                    <dt className="font-semibold text-stone-950">Why it matters</dt>
-                    <dd className="mt-1 text-stone-700">{humanRiskReason(item.risk_reason)}</dd>
-                  </div>
-                  <div>
-                    <dt className="font-semibold text-stone-950">Evidence</dt>
-                    <dd className="mt-1 text-stone-700">{item.evidence_label}{item.status === "needs_review" ? " - review needed" : ""} - {item.evidence_explanation}</dd>
-                  </div>
-                  <div>
-                    <dt className="font-semibold text-stone-950">Recommended action</dt>
-                    <dd className="mt-1 text-stone-700">{item.available_action}</dd>
-                  </div>
-                </dl>
-                <details className="mt-3 rounded border border-stone-200 bg-white/70 p-2 text-xs text-stone-600">
-                  <summary className="cursor-pointer font-semibold text-stone-800">Why prioritized</summary>
-                  <p className="mt-2 text-stone-700">{item.ranking_explanation}</p>
-                  <dl className="mt-2 grid grid-cols-2 gap-2">
-                    {Object.entries(item.importance_reasons ?? {})
-                      .filter(([key]) => key !== "adaptive_detail" && key !== "explanations")
-                      .map(([key, value]) => (
-                        <div key={key}>
-                          <dt className="font-medium">{componentLabel(key)}</dt>
-                          <dd>{String(value)}</dd>
-                        </div>
-                      ))}
-                    <div>
-                      <dt className="font-medium">Recency tier</dt>
-                      <dd>{displayToken(item.storage_class)}</dd>
-                    </div>
-                  </dl>
-                  {item.rule_key ? <p className="mt-2">Safety rule: {displayToken(item.rule_key)}</p> : null}
-                </details>
-                <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-                  {item.provenance_spans?.entry_id ? (
-                    <Link className="rounded-md bg-teal-700 px-3 py-1.5 font-medium text-white hover:bg-teal-800 focus:outline-none focus:ring-2 focus:ring-teal-600" href={`/patients/${id}?demo=${encodeURIComponent(demo)}&source=${item.provenance_spans.entry_id}&span=${item.provenance_span_id}#entry-${item.provenance_spans.entry_id}`}>
-                      Review evidence -&gt;
-                    </Link>
-                  ) : null}
-                  {item.highlight_id ? <HighlightFeedbackButtons highlightId={item.highlight_id} /> : null}
-                </div>
-              </article>
-            )) : (
-              <p className="rounded-md border border-stone-200 bg-white p-4 text-stone-600">No active Glance items.</p>
-            )}
-          </div>
-          {secondaryGlance.length ? (
-            <details className="mt-3 rounded-md border border-stone-200 bg-stone-50 p-3 text-sm">
-              <summary className="cursor-pointer font-semibold">Additional active context</summary>
-              <div className="mt-3 grid gap-2 md:grid-cols-2">
-                {secondaryGlance.map((item) => (
-                  <div className="rounded border border-stone-200 bg-white p-3" key={item.id}>
-                    <div className="flex flex-wrap items-center gap-2 text-xs">
-                      <span className={`rounded-full border px-2 py-0.5 font-semibold ${riskClass(item.risk)}`}>{item.risk.toUpperCase()}</span>
-                      <span>{displayToken(item.status)}</span>
-                    </div>
-                    <p className="mt-2 font-medium">{item.title}</p>
-                    <p className="mt-1 text-stone-600">{preview(item.short_summary)}</p>
-                  </div>
-                ))}
-              </div>
-            </details>
-          ) : null}
-        </section>
+        <GlanceSection demo={demo} patientId={id} items={visibleGlance} />
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
           <section>
@@ -412,7 +273,6 @@ export default async function PatientPage({
                           replies.push(comment);
                           repliesByParent.set(parent, replies);
                         }
-                        const displayContent = aiMeta?.body ?? entry.content;
                         const showHighlight = sourceEntryId === entry.id && !aiMeta;
                         const transcriptSpan = aiMeta ? firstTranscriptSpan(entry) : null;
                         const transcriptSource = transcriptSpan?.provenance_sources?.source_content ?? "";
@@ -434,16 +294,25 @@ export default async function PatientPage({
                               {showHighlight ? (
                                 <EvidenceText content={entry.content} evidenceStart={sourceSpan?.char_start ?? null} evidenceEnd={sourceSpan?.char_end ?? null} />
                               ) : (
-                                <p className="whitespace-pre-wrap">{preview(displayContent)}</p>
+                                <p className="whitespace-pre-wrap">{aiMeta ? aiMeta.summary : preview(entry.content)}</p>
                               )}
                             </div>
                             {aiMeta ? (
                               <details className="mt-3 text-xs text-stone-600">
                                 <summary className="cursor-pointer font-medium text-stone-700">AI details</summary>
                                 <p className="mt-1">Provider: {aiMeta.provider ?? "Seeded demo system entry"}</p>
-                                <p>Verification: {displayToken(aiMeta.reviewState)}</p>
+                                {aiMeta.model ? <p>Model: {aiMeta.model}</p> : null}
+                                <p>Review state: {displayToken(aiMeta.reviewState)}</p>
                                 {aiMeta.sourceLabel ? <p>Source: {aiMeta.sourceLabel}</p> : null}
                                 {aiMeta.sourceSessionIdentifier ? <p>Source session retained for audit/provenance.</p> : null}
+                                {aiMeta.keyPoints.length ? (
+                                  <div className="mt-2">
+                                    <p className="font-medium text-stone-700">Key points</p>
+                                    <ul className="mt-1 list-disc space-y-1 pl-5">
+                                      {aiMeta.keyPoints.map((point) => <li key={point}>{point}</li>)}
+                                    </ul>
+                                  </div>
+                                ) : null}
                                 <p>Runtime AI-scribe calls pass through PHI redaction before inference.</p>
                               </details>
                             ) : null}
@@ -500,9 +369,9 @@ export default async function PatientPage({
           <aside className="space-y-4">
             <section className="rounded-md border border-stone-200 bg-white p-4 shadow-sm">
               <h2 className="text-lg font-semibold">Conflict review</h2>
-              {result.factConflicts.length ? (
+              {visibleFactConflicts.length ? (
                 <div className="mt-3 space-y-3">
-                  {result.factConflicts.map((conflict) => {
+                  {visibleFactConflicts.map((conflict) => {
                     const factA = factById.get(conflict.fact_a_id);
                     const factB = factById.get(conflict.fact_b_id);
                     const entryA = factA?.provenance_spans?.entry_id ? entryById.get(factA.provenance_spans.entry_id) : undefined;

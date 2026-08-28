@@ -106,7 +106,7 @@ Clinical edits use optimistic concurrency. Writes include `expected_version`; st
 
 ## Trust Model
 
-AI-scribed entries are `author_role = system` and remain visually distinct from human notes. Runtime AI Scribe entries start as unverified internal content and retain provider/model metadata plus transcript source provenance. Structured extraction is preferred over generation for clinical facts. Candidates require exact evidence text, character offsets, source entry/version or transcript source, and provenance resolution before becoming trusted.
+AI-scribed entries are `author_role = system` and remain visually distinct from human notes. Runtime AI Scribe entries start as unverified internal content and retain provider/model metadata plus provenance to the original synthetic transcript/session. The server authorizes the care-team actor before provider invocation, then sends only redacted text through the safe gateway. Structured extraction is preferred over generation for clinical facts. Candidates require exact evidence text, character offsets, source entry/version or transcript source, and provenance resolution before becoming trusted.
 
 Provenance spans resolve to source entry, version, evidence offsets, evidence text, and transcript timestamps where applicable. If offsets are invalid, evidence text does not match, source is missing, or evidence is ambiguous, the system abstains and marks the item `needs_review`.
 
@@ -166,9 +166,9 @@ Latest measured warm Supabase/PostgREST path in `docs/performance/glance-benchma
 - measured requests: 50
 - concurrency: 1
 - network included: yes
-- P50: 157.74 ms
-- P95: 197.7 ms
-- P99: 735.03 ms
+- P50: 153.55 ms
+- P95: 253.12 ms
+- P99: 436.82 ms
 - failures: 0
 - target: P95 <= 300 ms
 - result: target met
