@@ -125,7 +125,13 @@ export function GlanceSection({
                   Review evidence -&gt;
                 </Link>
               ) : null}
-              {item.highlight_id ? <HighlightFeedbackButtons highlightId={item.highlight_id} /> : null}
+              {item.highlight_id ? (
+                <HighlightFeedbackButtons
+                  highlightId={item.highlight_id}
+                  confirmationStatus={item.confirmation_status}
+                  isConflict={Boolean(item.rule_key?.includes("CONFLICT"))}
+                />
+              ) : null}
             </div>
           </article>
         )) : (

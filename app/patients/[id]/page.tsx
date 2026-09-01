@@ -6,6 +6,7 @@ import {
   CommentComposer,
   CommentResolveButton,
   EntryEditor,
+  ConflictResolutionForm,
   NoteComposer,
   PatientFacingDraftComposer,
   PatientContentStatusButtons,
@@ -208,6 +209,8 @@ export default async function PatientPage({
   )?.provenance_spans ?? result.patientFacingContent
     .flatMap((item) => item.patient_content_sources ?? [])
     .find((source) => source.provenance_span_id === sourceSpanId && source.source_entry_id === sourceEntryId)
+    ?.provenance_spans ?? result.clinicalFacts
+    .find((fact) => fact.provenance_span_id === sourceSpanId && fact.provenance_spans?.entry_id === sourceEntryId)
     ?.provenance_spans;
   const commentsByEntry = new Map<string, typeof result.comments>();
   for (const comment of result.comments) {
@@ -407,7 +410,7 @@ export default async function PatientPage({
           </section>
 
           <aside className="space-y-4">
-            <details className="rounded-md border border-stone-200 bg-white shadow-sm">
+            <details className="rounded-md border border-stone-200 bg-white shadow-sm" id="conflict-review">
               <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-stone-800 hover:bg-stone-50">
                 <span>Conflict review</span>
                 <span className="ml-auto mr-2 rounded-full bg-stone-100 px-2.5 py-1 text-xs font-medium text-stone-600">{countLabel(visibleFactConflicts.length, "conflict")}</span>
@@ -421,24 +424,24 @@ export default async function PatientPage({
                     const entryA = factA?.provenance_spans?.entry_id ? entryById.get(factA.provenance_spans.entry_id) : undefined;
                     const entryB = factB?.provenance_spans?.entry_id ? entryById.get(factB.provenance_spans.entry_id) : undefined;
                     return (
-                      <div className="rounded-md border border-red-200 bg-red-50/70 p-3 text-sm" key={conflict.id}>
+                      <div className={`rounded-md border p-3 text-sm ${conflict.status === "unresolved" || conflict.status === "needs_further_review" ? "border-red-200 bg-red-50/70" : "border-stone-200 bg-stone-50"}`} id={`conflict-${conflict.id}`} key={conflict.id}>
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <strong>{displayToken(conflict.conflict_type)}</strong>
-                          <span className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-red-900">{displayToken(conflict.status)}</span>
+                          <span className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-stone-800">{displayToken(conflict.status)}</span>
                         </div>
                         <div className="mt-3 grid gap-2">
                           <div className="rounded border border-white bg-white/80 p-2">
                             <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Earlier evidence</p>
                             <p className="mt-1">{factSummary(factA)}</p>
                             <p className="text-xs text-stone-600">{entryA ? `${dateLabel(entryA.occurred_at)} - ${roleBadge(entryA)}` : "Source entry retained in provenance"}</p>
-                            {entryA ? <Link className="mt-1 inline-flex text-xs font-medium text-teal-800 hover:underline" href={`/patients/${id}?demo=${encodeURIComponent(demo)}&source=${entryA.id}#entry-${entryA.id}`}>View source -&gt;</Link> : null}
+                            {entryA ? <Link className="mt-1 inline-flex text-xs font-medium text-teal-800 hover:underline" href={`/patients/${id}?demo=${encodeURIComponent(demo)}&source=${entryA.id}&span=${factA?.provenance_span_id ?? ""}#entry-${entryA.id}`}>View source -&gt;</Link> : null}
                           </div>
                           <div className="text-center text-xs font-semibold text-stone-500">VS</div>
                           <div className="rounded border border-white bg-white/80 p-2">
                             <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Later evidence</p>
                             <p className="mt-1">{factSummary(factB)}</p>
                             <p className="text-xs text-stone-600">{entryB ? `${dateLabel(entryB.occurred_at)} - ${roleBadge(entryB)}` : "Source entry retained in provenance"}</p>
-                            {entryB ? <Link className="mt-1 inline-flex text-xs font-medium text-teal-800 hover:underline" href={`/patients/${id}?demo=${encodeURIComponent(demo)}&source=${entryB.id}#entry-${entryB.id}`}>View source -&gt;</Link> : null}
+                            {entryB ? <Link className="mt-1 inline-flex text-xs font-medium text-teal-800 hover:underline" href={`/patients/${id}?demo=${encodeURIComponent(demo)}&source=${entryB.id}&span=${factB?.provenance_span_id ?? ""}#entry-${entryB.id}`}>View source -&gt;</Link> : null}
                           </div>
                         </div>
                         <dl className="mt-3 space-y-1 text-xs text-stone-700">
@@ -450,7 +453,23 @@ export default async function PatientPage({
                         <details className="mt-2 rounded border border-red-100 bg-white/60 p-2 text-xs text-stone-600">
                           <summary className="cursor-pointer font-medium text-stone-700">Technical details</summary>
                           <p className="mt-1">Deterministic rule: {displayToken(conflict.conflict_type)}</p>
+                          {conflict.conflict_resolution_sources?.length ? <p>Reviewed provenance links: {conflict.conflict_resolution_sources.length}</p> : null}
                         </details>
+                        {conflict.resolved_at || conflict.resolution_outcome ? (
+                          <div className="mt-3 rounded border border-teal-100 bg-white/80 p-2 text-xs text-stone-700">
+                            <p className="font-semibold text-stone-900">Resolution</p>
+                            <p>{displayToken(conflict.resolution_outcome ?? conflict.status)}</p>
+                            {conflict.profiles?.display_name ? <p>Resolved by: {conflict.profiles.display_name}</p> : null}
+                            {conflict.resolved_at ? <p>Resolved at: {dateTimeLabel(conflict.resolved_at)}</p> : null}
+                            {conflict.resolution_reason ? <p className="mt-1 whitespace-pre-wrap">Rationale: {conflict.resolution_reason}</p> : null}
+                            {conflict.resolution_entry_id ? (
+                              <Link className="mt-1 inline-flex font-medium text-teal-800 hover:underline" href={`/patients/${id}?demo=${encodeURIComponent(demo)}&source=${conflict.resolution_entry_id}#entry-${conflict.resolution_entry_id}`}>
+                                View decision in timeline -&gt;
+                              </Link>
+                            ) : null}
+                          </div>
+                        ) : null}
+                        <ConflictResolutionForm conflictId={conflict.id} status={conflict.status} conflictType={conflict.conflict_type} actorRole={actor?.role} />
                       </div>
                     );
                   })}

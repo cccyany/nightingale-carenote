@@ -102,6 +102,9 @@ export type ClinicalFact = {
   provenance_span_id: string;
   provenance_spans: {
     entry_id: string | null;
+    char_start: number | null;
+    char_end: number | null;
+    evidence_text: string;
   } | null;
 };
 export type FactConflict = {
@@ -111,6 +114,19 @@ export type FactConflict = {
   fact_a_id: string;
   fact_b_id: string;
   created_at: string;
+  resolver_id: string | null;
+  resolved_at: string | null;
+  resolution_reason: string | null;
+  resolution_outcome: string | null;
+  resolution_entry_id: string | null;
+  corrected_fact_id: string | null;
+  profiles: DisplayProfile;
+  conflict_resolution_sources?: Array<{
+    id: string;
+    fact_id: string;
+    provenance_span_id: string;
+    source_version_id: string | null;
+  }> | null;
 };
 export type PatientFacingContent = {
   id: string;
@@ -272,17 +288,17 @@ export async function getPatientCareNote(patientId: string, filter: TimelineFilt
         .from("glance_items")
         .select("id, highlight_id, title, short_summary, status, risk, risk_reason, importance_score, importance_reasons, storage_class, ranking_explanation, provenance_span_id, available_action, confirmation_status, evidence_label, evidence_explanation, rule_key, provenance_spans:provenance_span_id(entry_id, char_start, char_end, evidence_text, provenance_sources:source_id(source_label))")
         .eq("patient_id", patientId)
-        .neq("status", "rejected")
+        .not("status", "in", "(rejected,resolved)")
         .order("importance_score", { ascending: false }),
       supabase
         .from("clinical_facts")
-        .select("id, entity_type, normalized_entity, value, unit, assertion, authority_role, evidence_confidence, review_status, provenance_span_id, provenance_spans:provenance_span_id(entry_id)")
+        .select("id, entity_type, normalized_entity, value, unit, assertion, authority_role, evidence_confidence, review_status, provenance_span_id, provenance_spans:provenance_span_id(entry_id, char_start, char_end, evidence_text)")
         .eq("patient_id", patientId)
         .order("created_at", { ascending: false })
         .limit(100),
       supabase
         .from("fact_conflicts")
-        .select("id, conflict_type, status, fact_a_id, fact_b_id, created_at")
+        .select("id, conflict_type, status, fact_a_id, fact_b_id, created_at, resolver_id, resolved_at, resolution_reason, resolution_outcome, resolution_entry_id, corrected_fact_id, profiles:resolver_id(display_name), conflict_resolution_sources(id, fact_id, provenance_span_id, source_version_id)")
         .eq("patient_id", patientId)
         .order("created_at", { ascending: false })
         .limit(8),
@@ -328,7 +344,7 @@ export async function getPatientCareNote(patientId: string, filter: TimelineFilt
     tasks: cleanTasks.map((task) => normalizeRelations(task) as unknown as CareNoteTask),
     glanceItems: cleanGlanceItems.map((item) => normalizeRelations(item) as unknown as GlanceItem),
     clinicalFacts: cleanClinicalFacts.map((fact) => normalizeRelations(fact) as unknown as ClinicalFact),
-    factConflicts: cleanFactConflicts as FactConflict[],
+    factConflicts: cleanFactConflicts.map((conflict) => normalizeRelations(conflict) as unknown as FactConflict),
     patientFacingContent: cleanPatientFacingContent as unknown as PatientFacingContent[]
   };
 }

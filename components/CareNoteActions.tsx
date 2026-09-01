@@ -611,7 +611,15 @@ export function TaskStatusButton({ taskId, status }: { taskId: string; status: s
   return <button className={secondaryButtonClass} onClick={submit} type="button">{status === "completed" ? "Reopen" : "Complete"}</button>;
 }
 
-export function HighlightFeedbackButtons({ highlightId }: { highlightId: string }) {
+export function HighlightFeedbackButtons({
+  highlightId,
+  confirmationStatus,
+  isConflict = false
+}: {
+  highlightId: string;
+  confirmationStatus?: string;
+  isConflict?: boolean;
+}) {
   const router = useRouter();
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState<"pin" | "clinician_confirmation" | "rejection" | null>(null);
@@ -643,19 +651,149 @@ export function HighlightFeedbackButtons({ highlightId }: { highlightId: string 
 
   return (
     <span className="inline-flex flex-wrap items-center gap-1">
-      {completed === "clinician_confirmation" ? <span className="rounded-full bg-teal-50 px-2 py-1 text-xs font-medium text-teal-900">Suggestion confirmed</span> : null}
+      {isConflict ? <a className={tealOutlineButtonClass} href="#conflict-review">Resolve conflict</a> : null}
       {completed === "rejection" ? <span className="rounded-full bg-red-50 px-2 py-1 text-xs font-medium text-red-800">Suggestion rejected</span> : null}
       {completed !== "rejection" ? (
         <>
           <button className={secondaryButtonClass} disabled={Boolean(pending)} onClick={() => submit("pin")} type="button">{pending === "pin" ? "Pinning..." : "Pin"}</button>
-          <button className={tealOutlineButtonClass} disabled={Boolean(pending) || completed === "clinician_confirmation"} onClick={() => submit("clinician_confirmation")} type="button">
-            {pending === "clinician_confirmation" ? "Confirming..." : completed === "clinician_confirmation" ? "Confirmed" : "Confirm suggestion"}
-          </button>
+          {!isConflict && confirmationStatus !== "confirmed" && completed !== "clinician_confirmation" ? (
+            <button className={tealOutlineButtonClass} disabled={Boolean(pending)} onClick={() => submit("clinician_confirmation")} type="button">
+              {pending === "clinician_confirmation" ? "Confirming..." : "Confirm suggestion"}
+            </button>
+          ) : null}
+          {!isConflict && (confirmationStatus === "confirmed" || completed === "clinician_confirmation") ? (
+            <span className="rounded-full bg-teal-50 px-2 py-1 text-xs font-medium text-teal-900">Suggestion confirmed</span>
+          ) : null}
           <button className={dangerButtonClass} disabled={Boolean(pending)} onClick={() => submit("rejection")} type="button">{pending === "rejection" ? "Rejecting..." : "Reject suggestion"}</button>
         </>
       ) : null}
       {message ? <span className="basis-full text-xs text-stone-600">{message}</span> : null}
     </span>
+  );
+}
+
+export function ConflictResolutionForm({
+  conflictId,
+  status,
+  conflictType,
+  actorRole
+}: {
+  conflictId: string;
+  status: string;
+  conflictType: string;
+  actorRole?: string;
+}) {
+  const router = useRouter();
+  const [outcome, setOutcome] = useState("accept_fact_a");
+  const [rationale, setRationale] = useState("");
+  const [entityType, setEntityType] = useState("medication");
+  const [normalizedEntity, setNormalizedEntity] = useState("");
+  const [value, setValue] = useState("");
+  const [unit, setUnit] = useState("");
+  const [assertion, setAssertion] = useState("present");
+  const [pending, setPending] = useState(false);
+  const [message, setMessage] = useState("");
+  const canResolve = actorRole === "clinician" || actorRole === "admin";
+  const reviewRole = actorRole === "admin" ? "admin" : "clinician";
+  const active = status === "unresolved" || status === "needs_further_review";
+  const rationaleRequired = outcome !== "unable_to_determine";
+  const correctionRequired = outcome === "corrected_value";
+  const canSubmit = active
+    && (!rationaleRequired || Boolean(rationale.trim()))
+    && (!correctionRequired || Boolean(normalizedEntity.trim()));
+
+  async function submit() {
+    setPending(true);
+    setMessage("");
+    const response = await fetch(`/api/conflicts/${conflictId}/resolve`, {
+      method: "POST",
+      headers: authHeaders(reviewRole),
+      body: JSON.stringify({
+        outcome,
+        rationale,
+        expectedStatus: status,
+        corrected: correctionRequired ? {
+          entityType,
+          normalizedEntity,
+          value: value.trim() || null,
+          unit: unit.trim() || null,
+          assertion
+        } : undefined
+      })
+    });
+    const payload = await response.json().catch(() => ({}));
+    setPending(false);
+    if (!response.ok) {
+      setMessage(payload?.message ?? payload?.error ?? `Resolution failed (${response.status}).`);
+      return;
+    }
+    setMessage(outcome === "unable_to_determine" ? "Conflict remains under review." : "Conflict resolution recorded in the timeline.");
+    router.refresh();
+  }
+
+  if (!active) {
+    return <p className="mt-2 text-xs text-stone-600">Resolved conflicts remain available here for history; the old conflict no longer occupies active Glance.</p>;
+  }
+  if (!canResolve) {
+    return <p className="mt-2 text-xs text-stone-600">Staff can review evidence. Conflict resolution requires clinician or admin review.</p>;
+  }
+
+  return (
+    <details className="mt-3 rounded border border-red-100 bg-white/70 p-2 text-xs text-stone-700">
+      <summary className="cursor-pointer font-semibold text-stone-800">Resolve conflict</summary>
+      <div className="mt-2 space-y-2">
+        <label className="block font-medium">
+          Decision
+          <select className="mt-1 w-full rounded border border-stone-300 p-2" onChange={(event) => setOutcome(event.target.value)} value={outcome}>
+            <option value="accept_fact_a">Earlier evidence is current/correct</option>
+            <option value="accept_fact_b">Later evidence is current/correct</option>
+            <option value="corrected_value">Neither is correct - enter corrected information</option>
+            <option value="unable_to_determine">Unable to determine - keep under review</option>
+          </select>
+        </label>
+        {correctionRequired ? (
+          <div className="grid gap-2 sm:grid-cols-2">
+            <label className="font-medium">
+              Fact type
+              <select className="mt-1 w-full rounded border border-stone-300 p-2" onChange={(event) => setEntityType(event.target.value)} value={entityType}>
+                <option value="allergy">Allergy</option>
+                <option value="medication">Medication</option>
+                <option value="dosage">Medication dose</option>
+                <option value="frequency">Medication frequency</option>
+              </select>
+            </label>
+            <label className="font-medium">
+              Entity
+              <input className="mt-1 w-full rounded border border-stone-300 p-2" onChange={(event) => setNormalizedEntity(event.target.value)} placeholder="metformin" value={normalizedEntity} />
+            </label>
+            <label className="font-medium">
+              Value
+              <input className="mt-1 w-full rounded border border-stone-300 p-2" onChange={(event) => setValue(event.target.value)} placeholder="500" value={value} />
+            </label>
+            <label className="font-medium">
+              Unit
+              <input className="mt-1 w-full rounded border border-stone-300 p-2" onChange={(event) => setUnit(event.target.value)} placeholder="mg" value={unit} />
+            </label>
+            <label className="font-medium">
+              Assertion
+              <select className="mt-1 w-full rounded border border-stone-300 p-2" onChange={(event) => setAssertion(event.target.value)} value={assertion}>
+                <option value="present">Present/current</option>
+                <option value="absent">Absent/not current</option>
+                <option value="unknown">Unknown</option>
+              </select>
+            </label>
+          </div>
+        ) : null}
+        <label className="block font-medium">
+          Clinician rationale
+          <textarea className="mt-1 min-h-20 w-full rounded border border-stone-300 p-2" onChange={(event) => setRationale(event.target.value)} placeholder={`Document the clinical reason for this ${displayToken(conflictType).toLowerCase()} decision.`} value={rationale} />
+        </label>
+        <button className={primaryButtonClass} disabled={pending || !canSubmit} onClick={submit} type="button">
+          {pending ? "Recording..." : outcome === "unable_to_determine" ? "Keep under review" : "Record resolution"}
+        </button>
+        {message ? <p className="text-xs text-stone-600">{message}</p> : null}
+      </div>
+    </details>
   );
 }
 
