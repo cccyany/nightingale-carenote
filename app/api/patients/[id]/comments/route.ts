@@ -8,9 +8,9 @@ export async function GET(
 ) {
   const { id } = await context.params;
   const token = bearerToken(request);
-  if (!token) return jsonError(401, "Unauthorized");
+  if (!token) return jsonError(401, "Unauthorized", "unauthorized");
   const supabase = await createSupabaseActorClient(token);
   const { data, error } = await supabase.from("comments").select("*").eq("patient_id", id);
-  if (error) return jsonError(403, error.message);
+  if (error) return jsonError(403, "Comments could not be loaded.", "database_error", error);
   return NextResponse.json({ comments: data ?? [] });
 }

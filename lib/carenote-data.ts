@@ -1,4 +1,5 @@
 import { createSupabaseActorClient } from "@/lib/supabase/request";
+import { logSafeError } from "@/lib/safe-error";
 import { isValidationNoiseText, presentableGlanceItems, validationNoiseSqlLikePatterns } from "./glance-presentation";
 import { applyTimelineEntryFilter, type TimelineFilter } from "./timeline-filters";
 
@@ -116,11 +117,30 @@ export type PatientFacingContent = {
   title: string;
   body: string;
   status: string;
+  content_type: string;
+  generation_method: string;
+  source_count: number;
   provenance_span_id: string | null;
   approved_at: string | null;
   created_at: string;
   review_status: string;
   evidence_confidence: number;
+  content_revision: number;
+  approved_revision: number | null;
+  patient_content_sources?: Array<{
+    id: string;
+    source_entry_id: string;
+    source_version_id: string;
+    provenance_span_id: string;
+    source_label: string;
+    source_occurred_at: string;
+    provenance_spans?: {
+      entry_id: string | null;
+      char_start: number | null;
+      char_end: number | null;
+      evidence_text: string;
+    } | null;
+  }>;
 };
 export type AssignableUser = {
   profile_id: string;
@@ -159,7 +179,7 @@ function logSupabaseError(context: string, error: unknown) {
     details?: string;
     hint?: string;
   };
-  console.error("[supabase]", context, {
+  logSafeError(context, "database_error", {
     code: supabaseError.code ?? null,
     message: supabaseError.message ?? String(error),
     details: supabaseError.details ?? null,
@@ -270,7 +290,7 @@ export async function getPatientCareNote(patientId: string, filter: TimelineFilt
         (contentQuery, pattern) => contentQuery.not("title", "ilike", pattern).not("body", "ilike", pattern),
         supabase
         .from("patient_facing_content")
-        .select("id, title, body, status, provenance_span_id, approved_at, created_at, review_status, evidence_confidence")
+        .select("id, title, body, status, content_type, generation_method, source_count, provenance_span_id, approved_at, created_at, review_status, evidence_confidence, content_revision, approved_revision, patient_content_sources(id, source_entry_id, source_version_id, provenance_span_id, source_label, source_occurred_at, provenance_spans:provenance_span_id(entry_id, char_start, char_end, evidence_text))")
         .eq("patient_id", patientId)
         .order("created_at", { ascending: false })
         .limit(8)
@@ -291,7 +311,15 @@ export async function getPatientCareNote(patientId: string, filter: TimelineFilt
   const cleanClinicalFacts = (clinicalFacts ?? []).filter((fact) => !isValidationNoiseText(JSON.stringify(fact)));
   const cleanFactIds = new Set(cleanClinicalFacts.map((fact) => fact.id));
   const cleanFactConflicts = (factConflicts ?? []).filter((conflict) => cleanFactIds.has(conflict.fact_a_id) && cleanFactIds.has(conflict.fact_b_id));
-  const cleanPatientFacingContent = (patientFacingContent ?? []).filter((item) => !isValidationNoiseText(`${item.title} ${item.body}`));
+  const cleanPatientFacingContent = (patientFacingContent ?? [])
+    .filter((item) => !isValidationNoiseText(`${item.title} ${item.body}`))
+    .map((item) => ({
+      ...item,
+      patient_content_sources: item.patient_content_sources?.map((source) => ({
+        ...source,
+        provenance_spans: firstRelation(source.provenance_spans as RelationObject | RelationObject[] | undefined)
+      }))
+    }));
 
   return {
     patient: normalizeRelations(patient) as unknown as CareNotePatient,
@@ -301,7 +329,7 @@ export async function getPatientCareNote(patientId: string, filter: TimelineFilt
     glanceItems: cleanGlanceItems.map((item) => normalizeRelations(item) as unknown as GlanceItem),
     clinicalFacts: cleanClinicalFacts.map((fact) => normalizeRelations(fact) as unknown as ClinicalFact),
     factConflicts: cleanFactConflicts as FactConflict[],
-    patientFacingContent: cleanPatientFacingContent as PatientFacingContent[]
+    patientFacingContent: cleanPatientFacingContent as unknown as PatientFacingContent[]
   };
 }
 

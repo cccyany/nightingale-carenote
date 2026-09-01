@@ -15,6 +15,27 @@ type Entry = {
   author_role: string;
 };
 
+export type PatientDraftSourceEntry = {
+  id: string;
+  entry_type: string;
+  author_role: string;
+  visibility: string;
+  content: string;
+  occurred_at: string;
+  current_version: number;
+  profiles?: { display_name: string } | null;
+};
+
+function aiFailureMessage(code?: string) {
+  if (code === "provider_timeout") {
+    return "AI generation timed out. Existing verified information remains available; please retry later.";
+  }
+  if (code === "provider_unavailable") {
+    return "AI generation is temporarily unavailable. Existing verified information remains available; please retry later.";
+  }
+  return "AI generation could not be completed safely. No AI note was created.";
+}
+
 const demoTokens = [
   ["staff", "Staff"],
   ["clinician", "Clinician"],
@@ -30,11 +51,60 @@ const tealOutlineButtonClass =
 const dangerButtonClass =
   "rounded-md border border-red-300 bg-white px-2 py-1 text-xs font-medium text-red-800 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:cursor-not-allowed disabled:opacity-55";
 
+const patientContentTypes = [
+  ["visit_summary", "Visit summary"],
+  ["follow_up_instructions", "Follow-up instructions"],
+  ["medication_instructions", "Medication instructions"],
+  ["care_plan_update", "Care plan update"],
+  ["general_update", "General patient update"]
+];
+
 function authHeaders(role: string) {
   return {
     "content-type": "application/json",
     authorization: `Bearer demo-${role}`
   };
+}
+
+function displayToken(value: string) {
+  return value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function dateLabel(value: string) {
+  return new Intl.DateTimeFormat("en-SG", { dateStyle: "medium", timeZone: "Asia/Singapore" }).format(new Date(value));
+}
+
+function timeLabel(value: string) {
+  return new Intl.DateTimeFormat("en-SG", { timeStyle: "short", timeZone: "Asia/Singapore" }).format(new Date(value));
+}
+
+function preview(content: string, max = 130) {
+  const text = content.replace(/\s+/g, " ").trim();
+  return text.length > max ? `${text.slice(0, max - 3)}...` : text;
+}
+
+function sourceLabel(entry: PatientDraftSourceEntry) {
+  if (entry.author_role === "system") return "AI Scribe";
+  if (entry.entry_type === "clinician_note") return "Clinician note";
+  if (entry.entry_type === "staff_note") return "Staff note";
+  if (entry.entry_type === "patient_note") return "Patient note";
+  return displayToken(entry.entry_type);
+}
+
+function eligiblePatientDraftSource(entry: PatientDraftSourceEntry) {
+  if (entry.visibility === "admin_only") return false;
+  return !["admin_event", "system_event"].includes(entry.entry_type);
+}
+
+function groupDraftSourcesByDate(entries: PatientDraftSourceEntry[]) {
+  const groups: { label: string; entries: PatientDraftSourceEntry[] }[] = [];
+  for (const entry of entries.filter(eligiblePatientDraftSource)) {
+    const label = dateLabel(entry.occurred_at);
+    const existing = groups.find((group) => group.label === label);
+    if (existing) existing.entries.push(entry);
+    else groups.push({ label, entries: [entry] });
+  }
+  return groups;
 }
 
 export function NoteComposer({ patientId }: { patientId: string }) {
@@ -111,7 +181,7 @@ export function AiScribeComposer({ patientId, actorRole }: { patientId: string; 
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
         const status = payload?.status === "needs_review" ? "Needs review" : `Generation failed (${response.status})`;
-        setError(`${status}. ${payload?.providerError ?? payload?.error ?? "The AI summary was not persisted."}`);
+        setError(`${status}. ${aiFailureMessage(payload?.code)}`);
         return;
       }
       setMessage(`AI Scribe created with ${payload.provider ?? "configured provider"}. It remains needs verification.`);
@@ -165,6 +235,206 @@ export function AiScribeComposer({ patientId, actorRole }: { patientId: string; 
   );
 }
 
+export function PatientFacingDraftComposer({
+  patientId,
+  actorRole,
+  entries,
+  initialSourceId
+}: {
+  patientId: string;
+  actorRole?: string;
+  entries: PatientDraftSourceEntry[];
+  initialSourceId?: string;
+}) {
+  const router = useRouter();
+  const [open, setOpen] = useState(Boolean(initialSourceId));
+  const [mode, setMode] = useState<"generate" | "manual">(initialSourceId ? "generate" : "generate");
+  const [contentType, setContentType] = useState("visit_summary");
+  const [selectedIds, setSelectedIds] = useState<string[]>(initialSourceId ? [initialSourceId] : []);
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [keyPoints, setKeyPoints] = useState<string[]>([]);
+  const [provider, setProvider] = useState("");
+  const [pending, setPending] = useState<"generate" | "save" | null>(null);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  if (actorRole !== "clinician" && actorRole !== "admin") return null;
+
+  const groups = groupDraftSourcesByDate(entries);
+  const selectedEntries = entries.filter((entry) => selectedIds.includes(entry.id));
+  const canSave = Boolean(title.trim() && body.trim() && selectedIds.length);
+
+  function toggleSource(entryId: string) {
+    setSelectedIds((ids) => ids.includes(entryId) ? ids.filter((id) => id !== entryId) : [...ids, entryId]);
+  }
+
+  function selectDate(entriesForDate: PatientDraftSourceEntry[]) {
+    const ids = entriesForDate.map((entry) => entry.id);
+    setSelectedIds((current) => Array.from(new Set([...current, ...ids])));
+  }
+
+  function resetDraft() {
+    setTitle("");
+    setBody("");
+    setKeyPoints([]);
+    setProvider("");
+    setMessage("");
+    setError("");
+  }
+
+  async function generateDraft() {
+    setPending("generate");
+    setMessage("");
+    setError("");
+    const response = await fetch(`/api/patients/${patientId}/patient-content`, {
+      method: "POST",
+      headers: authHeaders("clinician"),
+      body: JSON.stringify({ action: "generate", contentType, sourceEntryIds: selectedIds })
+    });
+    const payload = await response.json().catch(() => ({}));
+    setPending(null);
+    if (!response.ok) {
+      setError(payload?.error ?? aiFailureMessage(payload?.code));
+      return;
+    }
+    setTitle(payload.title ?? "");
+    setBody(payload.body ?? "");
+    setKeyPoints(Array.isArray(payload.keyPoints) ? payload.keyPoints : []);
+    setProvider(payload.provider ?? "Configured provider");
+    setMode("generate");
+    setMessage("Draft generated. Edit it before saving for clinician review.");
+  }
+
+  async function saveDraft() {
+    setPending("save");
+    setMessage("");
+    setError("");
+    const response = await fetch(`/api/patients/${patientId}/patient-content`, {
+      method: "POST",
+      headers: authHeaders("clinician"),
+      body: JSON.stringify({
+        action: "save",
+        contentType,
+        generationMethod: mode === "generate" ? "ai_assisted" : "manual",
+        sourceEntryIds: selectedIds,
+        title,
+        body
+      })
+    });
+    const payload = await response.json().catch(() => ({}));
+    setPending(null);
+    if (!response.ok) {
+      setError(payload?.error ?? `Draft could not be saved (${response.status}).`);
+      return;
+    }
+    resetDraft();
+    setSelectedIds([]);
+    setOpen(false);
+    setMessage("Saved for patient-facing review. It is not visible to the patient until approved.");
+    router.refresh();
+  }
+
+  return (
+    <div className="mt-3 rounded-md border border-teal-100 bg-teal-50/40 p-3">
+      <div className="flex flex-wrap gap-2">
+        <button className={primaryButtonClass} onClick={() => { setOpen(true); setMode("generate"); }} type="button">Generate from care record</button>
+        <button className={secondaryButtonClass} onClick={() => { setOpen(true); setMode("manual"); resetDraft(); }} type="button">+ Add manually</button>
+      </div>
+      {open ? (
+        <div className="mt-3 space-y-3 rounded-md border border-stone-200 bg-white p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="text-sm font-semibold">Create patient-facing content</h3>
+              <p className="text-xs text-stone-600">Select care-record entries first. Drafts stay hidden until approval.</p>
+            </div>
+            <button className={secondaryButtonClass} onClick={() => setOpen(false)} type="button">Close</button>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <label className="text-xs font-medium text-stone-700">
+              Output type
+              <select className="mt-1 w-full rounded border border-stone-300 p-2 text-sm" onChange={(event) => setContentType(event.target.value)} value={contentType}>
+                {patientContentTypes.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            </label>
+            <div className="text-xs text-stone-600">
+              <p className="font-medium text-stone-700">Sources selected</p>
+              <p>{selectedIds.length} care-record {selectedIds.length === 1 ? "entry" : "entries"}</p>
+            </div>
+          </div>
+          <div className="max-h-72 space-y-2 overflow-auto rounded border border-stone-200 p-2">
+            {groups.map((group) => (
+              <details className="rounded border border-stone-100 bg-stone-50" key={group.label} open={group.entries.some((entry) => selectedIds.includes(entry.id))}>
+                <summary className="cursor-pointer px-2 py-1 text-xs font-semibold text-stone-800">
+                  <span>{group.label}</span>
+                  <span className="ml-2 font-normal text-stone-500">{group.entries.length} eligible</span>
+                </summary>
+                <div className="space-y-1 border-t border-stone-100 p-2">
+                  <button className={tealOutlineButtonClass} onClick={() => selectDate(group.entries)} type="button">Select all eligible entries from this date</button>
+                  {group.entries.map((entry) => (
+                    <label className="mt-2 flex gap-2 rounded border border-stone-200 bg-white p-2 text-xs" key={entry.id}>
+                      <input checked={selectedIds.includes(entry.id)} className="mt-1" onChange={() => toggleSource(entry.id)} type="checkbox" />
+                      <span>
+                        <span className="block font-semibold text-stone-800">{sourceLabel(entry)} - {timeLabel(entry.occurred_at)}</span>
+                        <span className="block text-stone-600">{entry.profiles?.display_name ?? (entry.author_role === "system" ? "System" : "Care team")} - version {entry.current_version}</span>
+                        <span className="mt-1 block text-stone-700">{preview(entry.content)}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </details>
+            ))}
+          </div>
+          {mode === "generate" ? (
+            <button className={primaryButtonClass} disabled={pending === "generate" || !selectedIds.length} onClick={generateDraft} type="button">
+              {pending === "generate" ? "Generating draft..." : "Generate draft"}
+            </button>
+          ) : null}
+          <div className="space-y-2">
+            <label className="block text-xs font-medium text-stone-700" htmlFor="patient-draft-title">Title</label>
+            <input
+              className="w-full rounded border border-stone-300 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600"
+              id="patient-draft-title"
+              onChange={(event) => setTitle(event.target.value)}
+              placeholder="Patient-facing title"
+              value={title}
+            />
+            <label className="block text-xs font-medium text-stone-700" htmlFor="patient-draft-body">Body</label>
+            <textarea
+              className="min-h-32 w-full rounded border border-stone-300 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600"
+              id="patient-draft-body"
+              onChange={(event) => setBody(event.target.value)}
+              placeholder={mode === "manual" ? "Write patient-friendly content for clinician review." : "Generate a draft, then edit before saving."}
+              value={body}
+            />
+          </div>
+          {keyPoints.length ? (
+            <details className="rounded border border-stone-200 p-2 text-xs text-stone-700">
+              <summary className="cursor-pointer font-medium">AI draft details</summary>
+              {provider ? <p className="mt-1">Provider: {provider}</p> : null}
+              <p>Based on {selectedIds.length} selected care-record {selectedIds.length === 1 ? "entry" : "entries"}.</p>
+              <ul className="mt-1 list-disc space-y-1 pl-5">
+                {keyPoints.map((point) => <li key={point}>{point}</li>)}
+              </ul>
+            </details>
+          ) : selectedEntries.length ? (
+            <p className="text-xs text-stone-600">Based on {selectedEntries.length} selected care-record {selectedEntries.length === 1 ? "entry" : "entries"}.</p>
+          ) : null}
+          <div className="flex flex-wrap gap-2">
+            <button className={primaryButtonClass} disabled={pending === "save" || !canSave} onClick={saveDraft} type="button">
+              {pending === "save" ? "Saving..." : "Save for review"}
+            </button>
+            {mode === "generate" ? <button className={secondaryButtonClass} disabled={pending === "generate" || !selectedIds.length} onClick={generateDraft} type="button">Regenerate</button> : null}
+            <button className={secondaryButtonClass} onClick={() => { resetDraft(); setSelectedIds([]); setOpen(false); }} type="button">Cancel</button>
+          </div>
+          {message ? <p className="rounded border border-teal-200 bg-teal-50 p-2 text-xs text-teal-950">{message}</p> : null}
+          {error ? <p className="rounded border border-amber-300 bg-amber-50 p-2 text-xs text-amber-950">{error}</p> : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function EntryEditor({ entry }: { entry: Entry }) {
   const router = useRouter();
   const [role, setRole] = useState(entry.author_role === "clinician" ? "clinician" : "staff");
@@ -184,7 +454,7 @@ export function EntryEditor({ entry }: { entry: Entry }) {
     const payload = await response.json();
     if (response.status === 409) {
       setConflict(payload.currentContent ?? "Current version changed before your save.");
-      setMessage("Version conflict.");
+      setMessage(payload.message ?? "This note was updated by someone else. Review the latest version before saving again.");
       return;
     }
     setMessage(response.ok ? "Edit saved as a new version." : `Edit failed (${response.status}).`);
@@ -378,10 +648,30 @@ export function HighlightFeedbackButtons({ highlightId }: { highlightId: string 
   );
 }
 
-export function PatientContentStatusButtons({ contentId, status }: { contentId: string; status: string }) {
+function statusSuccessMessage(nextStatus: "approved" | "rejected", previousStatus: string) {
+  if (previousStatus === "rejected" && nextStatus === "approved") return "Rejection reversed. Content is now approved.";
+  if (previousStatus === "approved" && nextStatus === "rejected") return "Approved content rejected. Patients can no longer see it.";
+  return nextStatus === "approved" ? "Approved for patient view." : "Rejected; patients cannot see it.";
+}
+
+export function PatientContentStatusButtons({
+  contentId,
+  status,
+  title,
+  body
+}: {
+  contentId: string;
+  status: string;
+  title: string;
+  body: string;
+}) {
   const router = useRouter();
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState<"approved" | "rejected" | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [draftTitle, setDraftTitle] = useState(title);
+  const [draftBody, setDraftBody] = useState(body);
+  const [editPending, setEditPending] = useState(false);
 
   async function submit(nextStatus: "approved" | "rejected") {
     setPending(nextStatus);
@@ -392,14 +682,66 @@ export function PatientContentStatusButtons({ contentId, status }: { contentId: 
       body: JSON.stringify({ status: nextStatus })
     });
     setPending(null);
-    setMessage(response.ok ? `Marked ${nextStatus}.` : `Status change failed (${response.status}).`);
+    const payload = await response.json().catch(() => ({}));
+    setMessage(response.ok ? statusSuccessMessage(nextStatus, status) : (payload?.error ?? `Status change failed (${response.status}).`));
     if (response.ok) router.refresh();
   }
 
+  async function saveRevision() {
+    setEditPending(true);
+    setMessage("");
+    const response = await fetch(`/api/patient-content/${contentId}`, {
+      method: "PATCH",
+      headers: authHeaders("clinician"),
+      body: JSON.stringify({ title: draftTitle, body: draftBody })
+    });
+    const payload = await response.json().catch(() => ({}));
+    setEditPending(false);
+    if (!response.ok) {
+      setMessage(payload?.error ?? `Revision failed (${response.status}).`);
+      return;
+    }
+    setEditing(false);
+    setMessage("Revised content now needs clinician approval.");
+    router.refresh();
+  }
+
+  const canApprove = status !== "approved";
+  const canReject = status !== "rejected";
+
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-2">
-      <button className={tealOutlineButtonClass} disabled={status === "approved" || Boolean(pending)} onClick={() => submit("approved")} type="button">{pending === "approved" ? "Approving..." : "Approve"}</button>
-      <button className={dangerButtonClass} disabled={status === "rejected" || Boolean(pending)} onClick={() => submit("rejected")} type="button">{pending === "rejected" ? "Rejecting..." : "Reject"}</button>
+    <div className="mt-2 space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        {canApprove ? (
+          <button className={tealOutlineButtonClass} disabled={Boolean(pending) || editPending} onClick={() => submit("approved")} type="button">{pending === "approved" ? "Approving..." : status === "rejected" ? "Approve after review" : "Approve"}</button>
+        ) : null}
+        {canReject ? (
+          <button className={dangerButtonClass} disabled={Boolean(pending) || editPending} onClick={() => submit("rejected")} type="button">{pending === "rejected" ? "Rejecting..." : "Reject"}</button>
+        ) : null}
+        <button className={secondaryButtonClass} disabled={Boolean(pending) || editPending} onClick={() => setEditing((value) => !value)} type="button">{editing ? "Cancel edit" : "Edit / Revise"}</button>
+      </div>
+      {editing ? (
+        <div className="rounded border border-stone-200 bg-stone-50 p-2">
+          <label className="block text-xs font-medium text-stone-700" htmlFor={`patient-content-title-${contentId}`}>Title</label>
+          <input
+            className="mt-1 w-full rounded border border-stone-300 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600"
+            id={`patient-content-title-${contentId}`}
+            onChange={(event) => setDraftTitle(event.target.value)}
+            value={draftTitle}
+          />
+          <label className="mt-2 block text-xs font-medium text-stone-700" htmlFor={`patient-content-body-${contentId}`}>Content</label>
+          <textarea
+            className="mt-1 min-h-24 w-full rounded border border-stone-300 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600"
+            id={`patient-content-body-${contentId}`}
+            onChange={(event) => setDraftBody(event.target.value)}
+            value={draftBody}
+          />
+          <button className={`${primaryButtonClass} mt-2`} disabled={editPending || !draftTitle.trim() || !draftBody.trim()} onClick={saveRevision} type="button">
+            {editPending ? "Saving..." : "Save revision"}
+          </button>
+          <p className="mt-1 text-xs text-stone-600">Saving a revision always requires a fresh clinician decision.</p>
+        </div>
+      ) : null}
       {message ? <span className="text-xs text-stone-600">{message}</span> : null}
     </div>
   );

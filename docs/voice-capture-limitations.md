@@ -4,7 +4,7 @@ M30 implements a synthetic transcript capture path with a deterministic mock tra
 
 The privacy sequence is:
 
-synthetic audio or transcript upload -> transcription -> raw transcript -> PHI redaction -> LLM summarization/extraction
+synthetic transcript submission -> deterministic transcription abstraction -> raw transcript -> PHI redaction -> LLM summarization/extraction
 
 The raw transcript is never sent to the LLM provider before redaction. If redaction verification fails, the flow returns `needs_review`.
 

@@ -65,7 +65,7 @@ export function extractStructuredCandidates(input: ExtractInput): StructuredCand
     }
   }
 
-  const nkda = /\bno known drug allergies\b/i.exec(content);
+  const nkda = /\bno known (?:drug )?allergies\b/i.exec(content);
   if (nkda) {
     candidates.push({
       ...candidateBase(input, nkda, "penicillin"),

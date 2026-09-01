@@ -17,6 +17,31 @@ export interface LlmProvider {
 }
 
 export const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash";
+export const DEFAULT_LLM_TIMEOUT_MS = Number(process.env.LLM_PROVIDER_TIMEOUT_MS ?? 15000);
+
+export class LlmProviderError extends Error {
+  code: "provider_timeout" | "provider_unavailable" | "provider_error";
+
+  constructor(code: LlmProviderError["code"], message: string) {
+    super(message);
+    this.name = "LlmProviderError";
+    this.code = code;
+  }
+}
+
+function timeoutSignal(timeoutMs: number) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  return { signal: controller.signal, clear: () => clearTimeout(timeout) };
+}
+
+function classifyStatus(status: number) {
+  return status === 503 || status === 502 || status === 504 || status === 429 ? "provider_unavailable" : "provider_error";
+}
+
+function isAbortError(error: unknown) {
+  return error instanceof DOMException && error.name === "AbortError";
+}
 
 export class DeterministicMockProvider implements LlmProvider {
   public seenPayloads: string[] = [];
@@ -40,19 +65,31 @@ export class DeterministicMockProvider implements LlmProvider {
 export class OptionalHttpProvider implements LlmProvider {
   private endpoint: string;
   private apiKey: string;
+  private timeoutMs: number;
 
-  constructor(endpoint: string, apiKey: string) {
+  constructor(endpoint: string, apiKey: string, timeoutMs = DEFAULT_LLM_TIMEOUT_MS) {
     this.endpoint = endpoint;
     this.apiKey = apiKey;
+    this.timeoutMs = timeoutMs;
   }
 
   async invoke(request: LlmProviderRequest): Promise<LlmProviderResponse> {
-    const response = await fetch(this.endpoint, {
-      method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${this.apiKey}` },
-      body: JSON.stringify(request)
-    });
-    if (!response.ok) throw new Error(`LLM provider failed with ${response.status}`);
+    const timeout = timeoutSignal(this.timeoutMs);
+    let response: Response;
+    try {
+      response = await fetch(this.endpoint, {
+        method: "POST",
+        signal: timeout.signal,
+        headers: { "content-type": "application/json", authorization: `Bearer ${this.apiKey}` },
+        body: JSON.stringify(request)
+      });
+    } catch (error) {
+      if (isAbortError(error)) throw new LlmProviderError("provider_timeout", "LLM provider timed out");
+      throw new LlmProviderError("provider_error", "LLM provider request failed");
+    } finally {
+      timeout.clear();
+    }
+    if (!response.ok) throw new LlmProviderError(classifyStatus(response.status), `LLM provider failed with ${response.status}`);
     const payload = await response.json();
     return {
       provider: "optional_http",
@@ -104,21 +141,27 @@ function assertStructuredJson(text: string) {
 export class GeminiProvider implements LlmProvider {
   private apiKey: string;
   private model: string;
+  private timeoutMs: number;
 
-  constructor(apiKey: string, model = process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL) {
+  constructor(apiKey: string, model = process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL, timeoutMs = DEFAULT_LLM_TIMEOUT_MS) {
     this.apiKey = apiKey;
     this.model = model;
+    this.timeoutMs = timeoutMs;
   }
 
   async invoke(request: LlmProviderRequest): Promise<LlmProviderResponse> {
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(this.model)}:generateContent`;
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-goog-api-key": this.apiKey
-      },
-      body: JSON.stringify({
+    const timeout = timeoutSignal(this.timeoutMs);
+    let response: Response;
+    try {
+      response = await fetch(endpoint, {
+        method: "POST",
+        signal: timeout.signal,
+        headers: {
+          "content-type": "application/json",
+          "x-goog-api-key": this.apiKey
+        },
+        body: JSON.stringify({
         system_instruction: {
           parts: [{
             text: [
@@ -158,8 +201,14 @@ export class GeminiProvider implements LlmProvider {
             }
           }
         }
-      })
-    });
+        })
+      });
+    } catch (error) {
+      if (isAbortError(error)) throw new LlmProviderError("provider_timeout", "Gemini provider timed out");
+      throw new LlmProviderError("provider_error", "Gemini provider request failed");
+    } finally {
+      timeout.clear();
+    }
     if (!response.ok) {
       const errorText = await response.text();
       let message = response.statusText || "provider error";
@@ -171,7 +220,7 @@ export class GeminiProvider implements LlmProvider {
       } catch {
         message = response.statusText || "provider error";
       }
-      throw new Error(`Gemini provider failed with ${response.status}: ${message}`);
+      throw new LlmProviderError(classifyStatus(response.status), `Gemini provider failed with ${response.status}: ${message}`);
     }
 
     const payload = await response.json() as GeminiGenerateContentResponse;
@@ -180,7 +229,7 @@ export class GeminiProvider implements LlmProvider {
       .join("")
       .trim();
 
-    if (!text) throw new Error("Gemini provider returned no candidate text");
+    if (!text) throw new LlmProviderError("provider_error", "Gemini provider returned no candidate text");
     assertStructuredJson(text);
 
     return {

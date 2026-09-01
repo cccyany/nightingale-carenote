@@ -11,9 +11,9 @@ export async function POST(
 ) {
   const { id } = await context.params;
   const token = bearerToken(request);
-  if (!token) return jsonError(401, "Unauthorized");
+  if (!token) return jsonError(401, "Unauthorized", "unauthorized");
   const body = resolveSchema.safeParse(await request.json());
-  if (!body.success) return jsonError(400, "Invalid resolve payload");
+  if (!body.success) return jsonError(400, "Invalid resolve payload", "validation_error");
 
   const supabase = await createSupabaseActorClient(token);
   const { data, error } = await supabase.rpc("set_comment_resolved", {
@@ -21,6 +21,6 @@ export async function POST(
     p_resolved: body.data.resolved
   });
 
-  if (error) return jsonError(403, error.message);
+  if (error) return jsonError(403, "Comment status could not be changed.", "database_error", error);
   return NextResponse.json({ comment: data });
 }

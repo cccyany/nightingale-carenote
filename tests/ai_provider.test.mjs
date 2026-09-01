@@ -7,6 +7,7 @@ import {
   DEFAULT_GEMINI_MODEL,
   DeterministicMockProvider,
   GeminiProvider,
+  OptionalHttpProvider,
   configuredProvider
 } from "../lib/ai/provider.ts";
 import { invokeSafeLlm } from "../lib/ai/safe-gateway.ts";
@@ -146,7 +147,79 @@ test("malformed Gemini JSON fails safely through the gateway", async () => {
     );
     assert.equal(result.ok, false);
     assert.equal(result.state, "needs_review");
-    assert.match(result.providerError, /malformed JSON/);
+    assert.equal(result.code, "provider_error");
+    assert.equal(result.providerError, "provider_error");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("hanging Gemini fetch is aborted and classified as provider_timeout", async () => {
+  const originalFetch = globalThis.fetch;
+  let aborted = false;
+  globalThis.fetch = async (_url, init) => new Promise((_resolve, reject) => {
+    init.signal.addEventListener("abort", () => {
+      aborted = true;
+      reject(new DOMException("aborted", "AbortError"));
+    });
+  });
+
+  try {
+    const result = await invokeSafeLlm(
+      "Jane Tan S1234567D +65 9123 4567 reports cough.",
+      "ai_scribe_structured_ingest",
+      new GeminiProvider("synthetic-test-key", DEFAULT_GEMINI_MODEL, 5)
+    );
+    assert.equal(result.ok, false);
+    assert.equal(result.code, "provider_timeout");
+    assert.equal(result.providerError, "provider_timeout");
+    assert.equal(aborted, true);
+    assert.doesNotMatch(JSON.stringify(result), /Jane Tan|S1234567D|9123 4567/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("hanging optional HTTP provider fetch is aborted and classified as provider_timeout", async () => {
+  const originalFetch = globalThis.fetch;
+  let aborted = false;
+  globalThis.fetch = async (_url, init) => new Promise((_resolve, reject) => {
+    init.signal.addEventListener("abort", () => {
+      aborted = true;
+      reject(new DOMException("aborted", "AbortError"));
+    });
+  });
+
+  try {
+    const result = await invokeSafeLlm(
+      "No PHI here: repeat renal panel discussed.",
+      "ai_scribe_structured_ingest",
+      new OptionalHttpProvider("https://example.test/llm", "synthetic-key", 5)
+    );
+    assert.equal(result.ok, false);
+    assert.equal(result.code, "provider_timeout");
+    assert.equal(result.providerError, "provider_timeout");
+    assert.equal(aborted, true);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Gemini 503 is provider_unavailable and does not fall back to mock", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    error: { status: "UNAVAILABLE", message: "temporarily unavailable" }
+  }), { status: 503, headers: { "content-type": "application/json" } });
+
+  try {
+    const result = await invokeSafeLlm(
+      "No PHI here: repeat renal panel discussed.",
+      "ai_scribe_structured_ingest",
+      new GeminiProvider("synthetic-test-key", DEFAULT_GEMINI_MODEL, 100)
+    );
+    assert.equal(result.ok, false);
+    assert.equal(result.code, "provider_unavailable");
+    assert.equal(result.providerError, "provider_unavailable");
   } finally {
     globalThis.fetch = originalFetch;
   }

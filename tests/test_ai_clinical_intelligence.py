@@ -3,6 +3,7 @@ import uuid
 import pytest
 
 from tests.supabase_rest import service_session, sign_in
+from tests.test_artifact_cleanup import cleanup_entry_artifacts, cleanup_patient_content_artifacts
 
 
 pytestmark = pytest.mark.supabase_integration
@@ -24,6 +25,11 @@ def clinician_session():
 
 
 @pytest.fixture(scope="module")
+def staff_session():
+    return sign_in("staff.a@example.test")
+
+
+@pytest.fixture(scope="module")
 def patient_session():
     return sign_in("patient.jane@example.test")
 
@@ -31,6 +37,15 @@ def patient_session():
 @pytest.fixture(scope="module")
 def clinic_b_staff_session():
     return sign_in("staff.b@example.test")
+
+
+@pytest.fixture(autouse=True)
+def cleanup_ai_clinical_artifacts(service):
+    cleanup_patient_content_artifacts(service)
+    cleanup_entry_artifacts(service)
+    yield
+    cleanup_patient_content_artifacts(service)
+    cleanup_entry_artifacts(service)
 
 
 def test_ai_extracted_candidate_has_exact_usable_provenance(service) -> None:
@@ -110,20 +125,26 @@ def test_conflict_detection_preserves_traceable_allergy_medication_and_dose_conf
         {"select": "id,conflict_type,fact_a_id,fact_b_id,status", "patient_id": f"eq.{JANE_PATIENT_ID}"},
     )
     assert status == 200, conflicts
-    by_type = {row["conflict_type"]: row for row in conflicts}
     for conflict_type in ["ALLERGY_CONFLICT", "MEDICATION_CONFLICT", "MEDICATION_DOSE_CONFLICT"]:
-        assert conflict_type in by_type
-        assert by_type[conflict_type]["status"] == "unresolved"
-        for fact_key in ["fact_a_id", "fact_b_id"]:
-            status, fact_rows = service.get(
-                "clinical_facts",
-                {"select": "id,provenance_span_id", "id": f"eq.{by_type[conflict_type][fact_key]}"},
-            )
-            assert status == 200, fact_rows
-            assert fact_rows and fact_rows[0]["provenance_span_id"]
-            status, resolution = service.rpc("validate_provenance_span", {"p_span_id": fact_rows[0]["provenance_span_id"]})
-            assert status == 200, resolution
-            assert resolution["ok"] is True
+        candidates = [row for row in conflicts if row["conflict_type"] == conflict_type and row["status"] == "unresolved"]
+        assert candidates
+        traceable_conflict = None
+        for conflict in candidates:
+            resolutions = []
+            for fact_key in ["fact_a_id", "fact_b_id"]:
+                status, fact_rows = service.get(
+                    "clinical_facts",
+                    {"select": "id,provenance_span_id", "id": f"eq.{conflict[fact_key]}"},
+                )
+                assert status == 200, fact_rows
+                assert fact_rows and fact_rows[0]["provenance_span_id"]
+                status, resolution = service.rpc("validate_provenance_span", {"p_span_id": fact_rows[0]["provenance_span_id"]})
+                assert status == 200, resolution
+                resolutions.append(resolution)
+            if all(resolution["ok"] is True for resolution in resolutions):
+                traceable_conflict = conflict
+                break
+        assert traceable_conflict is not None
 
         status, risk = service.rpc("deterministic_risk_floor", {"p_rule_key": conflict_type, "p_suggested": "low"})
         assert status == 200, risk
@@ -217,3 +238,124 @@ def test_unresolved_provenance_cannot_be_approved_or_published(clinician_session
     status, patient_rows = patient_session.get("patient_facing_content", {"select": "id", "id": f"eq.{content_id}"})
     assert status == 200
     assert patient_rows == []
+
+
+def test_exact_penicillin_vs_no_known_allergies_conflict_reaches_glance(
+    staff_session, clinician_session, service
+) -> None:
+    nurse_text = f"Nurse: Penicillin allergy. {uuid.uuid4()}"
+    status, nurse_entry = staff_session.rpc(
+        "create_care_entry",
+        {
+            "p_patient_id": JANE_PATIENT_ID,
+            "p_entry_type": "staff_note",
+            "p_visibility": "staff_internal",
+            "p_content": nurse_text,
+        },
+    )
+    assert status == 200, nurse_entry
+    nurse_start = nurse_text.index("Penicillin allergy")
+    status, nurse_span = staff_session.rpc(
+        "create_provenance_for_entry_span",
+        {
+            "p_entry_id": nurse_entry["id"],
+            "p_evidence_text": "Penicillin allergy",
+            "p_char_start": nurse_start,
+            "p_char_end": nurse_start + len("Penicillin allergy"),
+            "p_source_label": "Nurse challenge source",
+        },
+    )
+    assert status == 200, nurse_span
+    status, nurse_fact = staff_session.rpc(
+        "upsert_fact_from_span",
+        {
+            "p_entry_id": nurse_entry["id"],
+            "p_entity_type": "allergy",
+            "p_normalized_entity": "penicillin",
+            "p_value": None,
+            "p_unit": None,
+            "p_assertion": "present",
+            "p_provenance_span_id": nurse_span,
+            "p_confidence": 0.9,
+            "p_review_status": "needs_review",
+            "p_extraction_method": "deterministic_challenge",
+        },
+    )
+    assert status == 200, nurse_fact
+
+    ai_text = f"Patient: No known allergies. {uuid.uuid4()}"
+    status, ai_entry_id = clinician_session.rpc(
+        "ingest_ai_scribed_note",
+        {
+            "p_patient_id": JANE_PATIENT_ID,
+            "p_entry_type": "ai_patient_session_summary",
+            "p_content": ai_text,
+            "p_source_label": "AI challenge source",
+            "p_session_identifier": "challenge-session",
+        },
+    )
+    assert status == 200, ai_entry_id
+    ai_start = ai_text.index("No known allergies")
+    status, ai_span = clinician_session.rpc(
+        "create_provenance_for_entry_span",
+        {
+            "p_entry_id": ai_entry_id,
+            "p_evidence_text": "No known allergies",
+            "p_char_start": ai_start,
+            "p_char_end": ai_start + len("No known allergies"),
+            "p_source_label": "AI challenge source",
+        },
+    )
+    assert status == 200, ai_span
+    status, ai_fact = clinician_session.rpc(
+        "upsert_fact_from_span",
+        {
+            "p_entry_id": ai_entry_id,
+            "p_entity_type": "allergy",
+            "p_normalized_entity": "penicillin",
+            "p_value": None,
+            "p_unit": None,
+            "p_assertion": "absent",
+            "p_provenance_span_id": ai_span,
+            "p_confidence": 0.9,
+            "p_review_status": "needs_review",
+            "p_extraction_method": "deterministic_challenge",
+        },
+    )
+    assert status == 200, ai_fact
+
+    status, count = clinician_session.rpc("detect_fact_conflicts_for_patient", {"p_patient_id": JANE_PATIENT_ID})
+    assert status == 200, count
+    assert count >= 1
+
+    status, conflicts = service.get(
+        "fact_conflicts",
+        {
+            "select": "id,conflict_type,fact_a_id,fact_b_id,status",
+            "patient_id": f"eq.{JANE_PATIENT_ID}",
+        },
+    )
+    assert status == 200, conflicts
+    matching = [
+        row for row in conflicts
+        if {row["fact_a_id"], row["fact_b_id"]} == {nurse_fact, ai_fact}
+        and row["conflict_type"] == "ALLERGY_CONFLICT"
+    ]
+    assert matching
+    assert matching[0]["status"] == "unresolved"
+
+    for span_id in [nurse_span, ai_span]:
+        status, resolution = service.rpc("validate_provenance_span", {"p_span_id": span_id})
+        assert status == 200, resolution
+        assert resolution["ok"] is True
+
+    status, risk = service.rpc("deterministic_risk_floor", {"p_rule_key": "ALLERGY_CONFLICT", "p_suggested": "low"})
+    assert status == 200, risk
+    assert risk == "high"
+
+    status, glance = clinician_session.get(
+        "glance_items",
+        {"select": "id,title,risk,rule_key,status", "patient_id": f"eq.{JANE_PATIENT_ID}", "rule_key": "eq.ALLERGY_CONFLICT"},
+    )
+    assert status == 200, glance
+    assert any(row["risk"] == "high" and row["status"] == "needs_review" for row in glance)

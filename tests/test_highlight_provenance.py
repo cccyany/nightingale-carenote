@@ -3,6 +3,7 @@ import uuid
 import pytest
 
 from tests.supabase_rest import service_session, sign_in
+from tests.test_artifact_cleanup import cleanup_entry_artifacts
 
 
 pytestmark = pytest.mark.supabase_integration
@@ -20,6 +21,13 @@ def service():
 @pytest.fixture(scope="module")
 def clinician_session():
     return sign_in("clinician.a@example.test")
+
+
+@pytest.fixture(autouse=True)
+def cleanup_provenance_artifacts(service):
+    cleanup_entry_artifacts(service)
+    yield
+    cleanup_entry_artifacts(service)
 
 
 def test_trusted_highlights_have_resolvable_exact_provenance(service) -> None:
@@ -126,9 +134,15 @@ def test_invalid_provenance_stays_needs_review_and_not_trusted(clinician_session
 
 
 def test_deterministic_risk_floor_cannot_be_lowered(service) -> None:
-    status, risk = service.rpc("deterministic_risk_floor", {"p_rule_key": "ALLERGY_CONFLICT", "p_suggested": "low"})
-    assert status == 200, risk
-    assert risk == "high"
+    for rule_key in [
+        "ALLERGY_CONFLICT",
+        "MEDICATION_CONFLICT",
+        "MEDICATION_DOSE_CONFLICT",
+        "UNRESOLVED_CRITICAL_TASK",
+    ]:
+        status, risk = service.rpc("deterministic_risk_floor", {"p_rule_key": rule_key, "p_suggested": "low"})
+        assert status == 200, risk
+        assert risk == "high"
 
     status, risk = service.rpc("deterministic_risk_floor", {"p_rule_key": "UNRESOLVED_TASK", "p_suggested": "low"})
     assert status == 200, risk
@@ -145,3 +159,54 @@ def test_unsupported_or_ambiguous_evidence_abstains_from_active_glance(service) 
         status, glance = service.get("glance_items", {"select": "id", "highlight_id": f"eq.{row['id']}"})
         assert status == 200, glance
         assert glance == []
+
+
+def test_provenance_resolves_original_version_after_source_edit(clinician_session, service) -> None:
+    original = "Patient reports penicillin allergy."
+    status, entry = clinician_session.rpc(
+        "create_care_entry",
+        {
+            "p_patient_id": JANE_PATIENT_ID,
+            "p_entry_type": "clinician_note",
+            "p_visibility": "clinician_internal",
+            "p_content": original,
+        },
+    )
+    assert status == 200, entry
+    char_start = original.index("penicillin allergy")
+    char_end = char_start + len("penicillin allergy")
+    status, span_id = clinician_session.rpc(
+        "create_provenance_for_entry_span",
+        {
+            "p_entry_id": entry["id"],
+            "p_evidence_text": "penicillin allergy",
+            "p_char_start": char_start,
+            "p_char_end": char_end,
+            "p_source_label": "Versioned provenance edit test",
+        },
+    )
+    assert status == 200, span_id
+    status, before = service.rpc("validate_provenance_span", {"p_span_id": span_id})
+    assert status == 200, before
+    assert before["ok"] is True
+
+    status, edit = clinician_session.rpc(
+        "edit_care_entry",
+        {
+            "p_entry_id": entry["id"],
+            "p_expected_version": 1,
+            "p_content": "Patient denies penicillin allergy in updated note.",
+            "p_change_reason": "source changed after highlight",
+        },
+    )
+    assert status == 200, edit
+    assert edit["version"] == 2
+
+    status, after = service.rpc("validate_provenance_span", {"p_span_id": span_id})
+    assert status == 200, after
+    assert after["ok"] is True
+    assert after["version_id"] == before["version_id"]
+    assert after["evidence_text"] == "penicillin allergy"
+    status, versions = service.get("entry_versions", {"select": "version_number,content", "id": f"eq.{after['version_id']}"})
+    assert status == 200, versions
+    assert versions == [{"version_number": 1, "content": original}]

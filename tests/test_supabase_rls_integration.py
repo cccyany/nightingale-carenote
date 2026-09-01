@@ -38,6 +38,11 @@ def admin_session():
 
 
 @pytest.fixture(scope="module")
+def clinic_b_staff_session():
+    return sign_in("staff.b@example.test")
+
+
+@pytest.fixture(scope="module")
 def service():
     return service_session()
 
@@ -118,6 +123,25 @@ def test_clinic_a_users_cannot_access_clinic_b_patient_data(request, session_fix
 
     assert status == 200
     assert rows == []
+
+
+def test_clinic_b_cannot_access_jane_related_data_even_without_app_filter(clinic_b_staff_session, service) -> None:
+    assert_schema_seed_present(service)
+
+    status, patients = clinic_b_staff_session.get("patients", {"select": "id,display_name", "id": f"eq.{JANE_PATIENT_ID}"})
+    assert status == 200
+    assert patients == []
+
+    status, entries = clinic_b_staff_session.get("care_entries", {"select": "id,patient_id", "patient_id": f"eq.{JANE_PATIENT_ID}"})
+    assert status == 200
+    assert entries == []
+
+    status, content = clinic_b_staff_session.get("patient_facing_content", {"select": "id,patient_id", "patient_id": f"eq.{JANE_PATIENT_ID}"})
+    assert status == 200
+    assert content == []
+
+    status, glance = clinic_b_staff_session.rpc("read_patient_glance", {"p_patient_id": JANE_PATIENT_ID})
+    assert status in {400, 403}, glance
 
 
 def test_unauthorized_direct_database_access_fails_when_ui_is_bypassed(patient_session, staff_session, service) -> None:

@@ -2,6 +2,7 @@ import pytest
 import uuid
 
 from tests.supabase_rest import service_session, sign_in
+from tests.test_artifact_cleanup import cleanup_glance_artifacts
 
 
 pytestmark = pytest.mark.supabase_integration
@@ -24,6 +25,13 @@ def clinician_session():
 @pytest.fixture(scope="module")
 def clinic_b_staff_session():
     return sign_in("staff.b@example.test")
+
+
+@pytest.fixture(autouse=True)
+def cleanup_learning_artifacts(service):
+    cleanup_glance_artifacts(service)
+    yield
+    cleanup_glance_artifacts(service)
 
 
 def _candidate(session, patient_id: str, title: str, feature: str, rule_key: str = "SYMPTOM_PERSISTENT"):

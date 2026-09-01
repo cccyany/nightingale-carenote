@@ -26,7 +26,10 @@ export const validationNoiseSqlLikePatterns = [
   "%Synthetic rejected draft%",
   "%Synthetic rejected patient content%",
   "%Synthetic approved instruction%",
-  "%Synthetic unresolved draft%"
+  "%Synthetic unresolved draft%",
+  "%Synthetic dosage approval%",
+  "%Patient: No known allergies.%",
+  "%Nurse: Penicillin allergy.%"
 ];
 
 type GlancePresentationItem = {
@@ -62,7 +65,11 @@ const validationNoisePatterns = [
   /\bSynthetic rejected draft\b/i,
   /\bSynthetic rejected patient content\b/i,
   /\bSynthetic approved instruction\b/i,
-  /\bSynthetic unresolved draft\b/i
+  /\bSynthetic unresolved draft\b/i,
+  /\bSynthetic dosage approval\b/i,
+  /\bPatient:\s*No known allergies\.\s+[0-9a-f-]{36}\b/i,
+  /\bNurse:\s*Penicillin allergy\.\s+[0-9a-f-]{36}\b/i,
+  /\bTake synthetic metformin 1000 mg once daily\b/i
 ];
 
 export function isValidationNoiseText(text: string) {

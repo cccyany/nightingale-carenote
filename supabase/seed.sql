@@ -13,6 +13,12 @@ where title like 'Synthetic patient approval%'
    or title like 'Synthetic rejected draft%'
    or title like 'Synthetic low trust draft%'
    or title like 'Synthetic approved summary%'
+   or title like 'Synthetic dosage approval%'
+   or title like 'Synthetic generated patient draft%'
+   or title like 'Synthetic manual patient draft%'
+   or title like 'Synthetic multi-source patient draft%'
+   or title like 'Synthetic partial-date patient draft%'
+   or title like 'Synthetic versioned patient draft%'
    or title = 'Synthetic unresolved draft';
 
 delete from transcript_sessions
@@ -30,6 +36,102 @@ where title like 'Synthetic baseline cough candidate%'
    or title like 'Synthetic safety baseline%'
    or title like 'Synthetic safety future%'
    or title like 'Synthetic unsupported candidate%';
+
+with test_entries as (
+  select ce.id
+  from care_entries ce
+  where ce.patient_id = '30000000-0000-0000-0000-000000000001'
+    and (
+      ce.content like 'Synthetic collaboration note %'
+      or ce.content like 'Synthetic initial plan %'
+      or ce.content in (
+        'Synthetic revision base.',
+        'Synthetic revision middle.',
+        'Synthetic audit base.',
+        'Synthetic audit updated content.',
+        'Synthetic updated clinician plan.',
+        'Synthetic staff independent update.',
+        'Synthetic clinician independent update.',
+        'Synthetic first writer wins.',
+        'Synthetic stale overwrite attempt.',
+        'Synthetic clinician cross-role overwrite attempt.',
+        'Synthetic ambient summary.'
+      )
+      or ce.content like 'Synthetic staff base %'
+      or ce.content like 'Synthetic clinician base %'
+      or ce.content like 'Synthetic concurrent base %'
+      or ce.content like 'Synthetic staff-owned note %'
+      or ce.content like 'Synthetic provenance base %'
+      or ce.content like 'Synthetic extraction base %'
+      or ce.content like 'Synthetic patient-facing source %'
+      or ce.content like 'Synthetic patient-facing V1 source %'
+      or ce.content like 'Patient: No known allergies. %'
+      or ce.content like 'Nurse: Penicillin allergy. %'
+    )
+),
+test_spans as (
+  select psn.id
+  from provenance_spans psn
+  join provenance_sources ps on ps.id = psn.source_id
+  where ps.source_entry_id in (select id from test_entries)
+     or psn.entry_id in (select id from test_entries)
+),
+deleted_feedback as (
+  delete from importance_feedback ifb
+  using highlights h
+  where ifb.highlight_id = h.id
+    and h.provenance_span_id in (select id from test_spans)
+  returning ifb.id
+),
+deleted_glance as (
+  delete from glance_items gi
+  where gi.provenance_span_id in (select id from test_spans)
+     or gi.highlight_id in (
+      select h.id from highlights h where h.provenance_span_id in (select id from test_spans)
+     )
+  returning gi.id
+),
+deleted_highlights as (
+  delete from highlights h
+  where h.provenance_span_id in (select id from test_spans)
+  returning h.id
+),
+deleted_conflicts as (
+  delete from fact_conflicts fc
+  where fc.fact_a_id in (
+      select cf.id from clinical_facts cf where cf.source_entry_id in (select id from test_entries)
+         or cf.provenance_span_id in (select id from test_spans)
+    )
+     or fc.fact_b_id in (
+      select cf.id from clinical_facts cf where cf.source_entry_id in (select id from test_entries)
+         or cf.provenance_span_id in (select id from test_spans)
+    )
+  returning fc.id
+),
+deleted_facts as (
+  delete from clinical_facts cf
+  where cf.source_entry_id in (select id from test_entries)
+     or cf.provenance_span_id in (select id from test_spans)
+  returning cf.id
+),
+deleted_patient_content_sources as (
+  delete from patient_content_sources pcs
+  where pcs.provenance_span_id in (select id from test_spans)
+     or pcs.source_entry_id in (select id from test_entries)
+  returning pcs.id
+),
+deleted_spans as (
+  delete from provenance_spans psn
+  where psn.id in (select id from test_spans)
+  returning psn.id
+),
+deleted_sources as (
+  delete from provenance_sources ps
+  where ps.source_entry_id in (select id from test_entries)
+  returning ps.id
+)
+delete from care_entries ce
+where ce.id in (select id from test_entries);
 
 delete from care_entries ce
 where ce.patient_id = '30000000-0000-0000-0000-000000000001'
@@ -55,6 +157,10 @@ where ce.patient_id = '30000000-0000-0000-0000-000000000001'
     or ce.content like 'Synthetic staff-owned note %'
     or ce.content like 'Synthetic provenance base %'
     or ce.content like 'Synthetic extraction base %'
+    or ce.content like 'Synthetic patient-facing source %'
+    or ce.content like 'Synthetic patient-facing V1 source %'
+    or ce.content like 'Patient: No known allergies. %'
+    or ce.content like 'Nurse: Penicillin allergy. %'
   )
   and not exists (
     select 1 from provenance_sources ps where ps.source_entry_id = ce.id

@@ -41,6 +41,9 @@ class SupabaseSession:
     def patch(self, table: str, params: dict[str, str], payload: dict[str, object]) -> tuple[int, object]:
         return self._request("PATCH", f"/rest/v1/{table}?{urlencode(params)}", payload)
 
+    def delete(self, table: str, params: dict[str, str]) -> tuple[int, object]:
+        return self._request("DELETE", f"/rest/v1/{table}?{urlencode(params)}")
+
     def rpc(self, name: str, payload: dict[str, object]) -> tuple[int, object]:
         return self._request("POST", f"/rest/v1/rpc/{name}", payload)
 

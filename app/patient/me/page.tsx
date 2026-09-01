@@ -61,17 +61,37 @@ export default async function PatientMePage({
   }
 
   const supabase = await createSupabaseActorClient(demo);
+  const { data: patient, error: patientError } = await supabase
+    .from("patients")
+    .select("id, display_name, clinics(name)")
+    .limit(1)
+    .single();
+
+  if (patientError || !patient) {
+    return (
+      <AppShell demo={demo} patientView>
+        <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
+          <section className="rounded-md border border-stone-200 bg-white p-5 shadow-sm">
+            <h1 className="text-3xl font-semibold">My CareNote</h1>
+            <p className="mt-2 text-stone-700">No patient-safe record is available for this signed-in patient.</p>
+          </section>
+        </main>
+      </AppShell>
+    );
+  }
+
+  const clinic = Array.isArray(patient.clinics) ? patient.clinics[0] : patient.clinics;
   const [{ data: entries, error }, { data: approvedContent, error: contentError }] = await Promise.all([
     supabase
       .from("care_entries")
       .select("id, content, occurred_at, entry_type, author_role, visibility")
-      .eq("patient_id", "30000000-0000-0000-0000-000000000001")
+      .eq("patient_id", patient.id)
       .in("visibility", ["patient_approved", "patient_submitted"])
       .order("occurred_at", { ascending: false }),
     supabase
       .from("patient_facing_content")
       .select("id, title, body, approved_at, created_at")
-      .eq("patient_id", "30000000-0000-0000-0000-000000000001")
+      .eq("patient_id", patient.id)
       .eq("status", "approved")
       .order("approved_at", { ascending: false })
   ]);
@@ -102,7 +122,7 @@ export default async function PatientMePage({
     }));
 
   return (
-    <AppShell demo={demo} clinicName="Clinic A" patientName="Jane Tan" patientView>
+    <AppShell demo={demo} clinicName={clinic?.name ?? undefined} patientName={patient.display_name} patientView>
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
         <header className="rounded-md border border-teal-700 bg-white p-5 shadow-sm">
           <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Patient-safe view</p>

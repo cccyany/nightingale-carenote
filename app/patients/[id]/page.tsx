@@ -7,10 +7,12 @@ import {
   CommentResolveButton,
   EntryEditor,
   NoteComposer,
+  PatientFacingDraftComposer,
   PatientContentStatusButtons,
   ReplyComposer,
   TaskComposer,
-  TaskStatusButton
+  TaskStatusButton,
+  type PatientDraftSourceEntry
 } from "@/components/CareNoteActions";
 import { EvidenceText } from "@/components/EvidenceText";
 import { getClinicAssignableUsers, getPatientCareNote, type CareNoteEntry } from "@/lib/carenote-data";
@@ -133,6 +135,10 @@ function cleanDemoTitle(title: string) {
   return title.replace(/\s+[0-9a-f-]{36}$/i, "");
 }
 
+function contentTypeLabel(value: string) {
+  return displayToken(value || "general_update");
+}
+
 function groupEntriesByDate(entries: CareNoteEntry[]) {
   const groups: { label: string; entries: CareNoteEntry[] }[] = [];
   for (const entry of entries) {
@@ -162,7 +168,7 @@ export default async function PatientPage({
   searchParams
 }: {
   params: Promise<{ id: string }>;
-  searchParams?: Promise<{ demo?: string; filter?: string; source?: string; span?: string }>;
+  searchParams?: Promise<{ demo?: string; filter?: string; source?: string; span?: string; patientDraftSource?: string }>;
 }) {
   const { id } = await params;
   const resolvedSearch = await searchParams;
@@ -187,9 +193,13 @@ export default async function PatientPage({
   const actor = actorForDemo(demo);
   const sourceEntryId = resolvedSearch?.source;
   const sourceSpanId = resolvedSearch?.span;
+  const patientDraftSourceId = resolvedSearch?.patientDraftSource;
   const sourceSpan = result.glanceItems.find(
     (item) => item.provenance_span_id === sourceSpanId && item.provenance_spans?.entry_id === sourceEntryId
-  )?.provenance_spans;
+  )?.provenance_spans ?? result.patientFacingContent
+    .flatMap((item) => item.patient_content_sources ?? [])
+    .find((source) => source.provenance_span_id === sourceSpanId && source.source_entry_id === sourceEntryId)
+    ?.provenance_spans;
   const commentsByEntry = new Map<string, typeof result.comments>();
   for (const comment of result.comments) {
     const bucket = commentsByEntry.get(comment.entry_id) ?? [];
@@ -208,6 +218,16 @@ export default async function PatientPage({
   });
   const visibleGlance = presentableGlanceItems(result.glanceItems);
   const entryGroups = groupEntriesByDate(visibleEntries);
+  const patientDraftSources = visibleEntries.map((entry) => ({
+    id: entry.id,
+    entry_type: entry.entry_type,
+    author_role: entry.author_role,
+    visibility: entry.visibility,
+    content: entry.content,
+    occurred_at: entry.occurred_at,
+    current_version: entry.current_version,
+    profiles: entry.profiles
+  })) satisfies PatientDraftSourceEntry[];
 
   return (
     <AppShell demo={demo} patientId={id} patientName={result.patient.display_name} clinicName={result.patient.clinics?.name ?? actor?.clinicName}>
@@ -331,6 +351,14 @@ export default async function PatientPage({
                                 ) : null}
                               </details>
                             ) : null}
+                            {entry.author_role === "system" ? (
+                              <Link
+                                className="mt-3 inline-flex rounded-md border border-teal-700 px-2.5 py-1 text-xs font-medium text-teal-900 hover:bg-teal-50 focus:outline-none focus:ring-2 focus:ring-teal-600"
+                                href={`/patients/${id}?demo=${encodeURIComponent(demo)}&patientDraftSource=${entry.id}#patient-facing-review`}
+                              >
+                                Create patient-facing draft
+                              </Link>
+                            ) : null}
                             {entry.author_role === "staff" || entry.author_role === "clinician" ? <EntryEditor entry={entry} /> : null}
                             <CommentComposer entryId={entry.id} users={assignableUsers} />
                             {topLevelComments.length ? (
@@ -419,8 +447,10 @@ export default async function PatientPage({
               )}
             </section>
 
-            <section className="rounded-md border border-stone-200 bg-white p-4 shadow-sm">
+            <section className="rounded-md border border-stone-200 bg-white p-4 shadow-sm" id="patient-facing-review">
               <h2 className="text-lg font-semibold">Patient-facing review</h2>
+              <p className="mt-1 text-sm text-stone-600">Create patient-safe summaries or instructions from selected care-record sources. Drafts stay hidden until approved.</p>
+              <PatientFacingDraftComposer patientId={id} actorRole={actor?.role} entries={patientDraftSources} initialSourceId={patientDraftSourceId} />
               {visiblePatientFacingContent.length ? (
                 <div className="mt-3 space-y-2">
                   {visiblePatientFacingContent.map((item) => (
@@ -429,14 +459,32 @@ export default async function PatientPage({
                         <strong>{cleanDemoTitle(item.title)}</strong>
                         <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs">{displayToken(item.status)}</span>
                       </div>
+                      <p className="mt-1 text-xs font-medium text-stone-600">
+                        {contentTypeLabel(item.content_type)} - {item.generation_method === "ai_assisted" ? "AI-assisted draft" : "Manually created"} - Based on {item.source_count} care-record {item.source_count === 1 ? "entry" : "entries"}
+                      </p>
                       <p className="mt-1 text-stone-700">{preview(item.body)}</p>
                       <p className="mt-2 text-xs text-stone-600">Evidence quality {Number(item.evidence_confidence).toFixed(2)} - {displayToken(item.review_status)}</p>
-                      <PatientContentStatusButtons contentId={item.id} status={item.status} />
+                      {item.patient_content_sources?.length ? (
+                        <details className="mt-2 rounded border border-stone-200 bg-stone-50 p-2 text-xs text-stone-700">
+                          <summary className="cursor-pointer font-medium">Review sources</summary>
+                          <ul className="mt-2 space-y-1">
+                            {item.patient_content_sources.map((source) => (
+                              <li className="flex flex-wrap items-center justify-between gap-2 rounded bg-white px-2 py-1" key={source.id}>
+                                <span>{displayToken(source.source_label)} - {dateTimeLabel(source.source_occurred_at)}</span>
+                                <Link className="font-medium text-teal-800 hover:underline" href={`/patients/${id}?demo=${encodeURIComponent(demo)}&source=${source.source_entry_id}&span=${source.provenance_span_id}#entry-${source.source_entry_id}`}>
+                                  View source -&gt;
+                                </Link>
+                              </li>
+                            ))}
+                          </ul>
+                        </details>
+                      ) : null}
+                      <PatientContentStatusButtons contentId={item.id} status={item.status} title={item.title} body={item.body} />
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="mt-2 text-sm text-stone-600">Nothing awaiting review.</p>
+                <p className="mt-3 rounded border border-stone-200 bg-stone-50 p-3 text-sm text-stone-600">Nothing awaiting review.</p>
               )}
             </section>
 

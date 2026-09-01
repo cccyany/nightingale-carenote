@@ -101,7 +101,7 @@ npm.cmd run verify:gemini
 
 RBAC roles are `patient`, `staff`, `clinician`, and `admin`. Staff, clinicians, and admins are clinic-scoped. Patients can only see explicitly patient-safe approved content and intended patient-submitted information.
 
-PostgreSQL RLS protects base tables. Patients cannot retrieve raw AI-scribed notes, staff/clinician internal notes, internal comments, or unapproved AI-generated guidance. Clinic A users cannot access Clinic B data. Server routes also validate actor roles; UI filtering is not treated as the security boundary.
+PostgreSQL RLS protects base tables. Patients cannot retrieve raw AI-scribed notes, staff/clinician internal notes, internal comments, or unapproved AI-generated guidance. Clinic A users cannot access Clinic B data. Server routes also validate actor roles; UI filtering is not treated as the security boundary. Runtime API errors return stable safe codes/messages rather than raw provider/database text.
 
 The optimized `read_patient_glance` RPC is `SECURITY DEFINER` with fixed `search_path = public`, explicit patient lookup, and an explicit `user_has_clinic_role` check before returning Clinic-scoped rows.
 
@@ -127,13 +127,15 @@ Evidence confidence is evidence quality, not calibrated clinical probability:
 - Supported: exact provenance with no contradiction
 - Needs review: ambiguous, contradictory, unresolved, or low-confidence evidence
 
-Patient-facing AI content starts as draft or needs clinician approval. Only explicitly approved content is visible to patients; unresolved provenance or insufficient trust blocks approval.
+Patient-facing AI content starts as draft or needs clinician approval. Only explicitly approved content is visible to patients; unresolved provenance or insufficient trust blocks approval. Editing previously approved patient-facing content resets it to needs clinician approval until reapproved.
+
+Patient-facing summaries can be created manually or generated as editable AI-assisted drafts from selected longitudinal care-record entries. Generated drafts preserve source provenance and remain hidden from the patient until explicitly approved by the care team.
 
 ## Importance, Learning, and Decay
 
 Explainable importance ranking persists score components: risk contribution, unresolved action, recency, clinician confirmation, entity priority, decay, and bounded adaptive feedback. Tie-breaking is deterministic.
 
-Adaptive learning is clinic-scoped and bounded. It tracks exposure, manual highlight, pin, clinician confirmation, comments/interactions, and rejection. Exposure is not rejection. Learning changes importance only; it never changes facts, provenance, evidence quality, deterministic risk, or clinician confirmation.
+Adaptive learning is clinic-scoped and bounded. It tracks exposure, manual highlight, pin, clinician confirmation, comments/interactions, and rejection. Exposure is not rejection. Learning changes importance only; it never changes facts, provenance, evidence quality, deterministic risk, or clinician confirmation. This is safety-bounded ranking adaptation, not proof that exposure bias is solved.
 
 Data decay classifies Glance items as:
 
@@ -153,7 +155,7 @@ The current redactor detects synthetic names, Singapore NRIC/FIN-like identifier
 
 The provider abstraction supports a real Google Gemini adapter and deterministic/mock providers. If `GEMINI_API_KEY` is configured, server-side AI-scribe and synthetic voice-capture flows use Gemini with `GEMINI_MODEL` defaulting to the documented `gemini-3.5-flash` model. If no Gemini key is configured, the deterministic mock provider remains the default/fallback for tests, offline development, and demos without paid credentials.
 
-The Gemini provider receives redacted text only through `invokeSafeLlm()`. It asks for concise structured JSON for downstream validation, but deterministic extraction, provenance validation, clinical conflict detection, risk floors, importance ranking, and patient-facing approval remain separate from LLM generation. Malformed, empty, or provider-error responses fail into `needs_review` rather than becoming trusted clinical content.
+The Gemini provider receives redacted text only through `invokeSafeLlm()`. It asks for concise structured JSON for downstream validation, but deterministic extraction, provenance validation, clinical conflict detection, risk floors, importance ranking, and patient-facing approval remain separate from LLM generation. Malformed, empty, timed-out, unavailable, or provider-error responses fail into `needs_review` rather than becoming trusted clinical content.
 
 `npm.cmd run verify:gemini` performs a synthetic smoke test when `GEMINI_API_KEY` is present. It uses synthetic PHI, reports only redaction metadata and provider identity, and does not print the original synthetic values or API key.
 
@@ -209,3 +211,4 @@ These are prototype evaluation evidence on small synthetic fixtures, not clinica
 - Revision history stores full snapshots rather than complex semantic diff objects.
 - AI and transcription providers are abstracted; Gemini can be enabled with a server-only key, and deterministic mock providers keep tests/offline demos working without paid credentials.
 - Ambient voice capture is synthetic and not validated for real clinical audio.
+- Phone-only patient identity, WhatsApp/SMS/email delivery, and realtime streaming consult alerts are not implemented in this repository.

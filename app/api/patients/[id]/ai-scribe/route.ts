@@ -16,21 +16,21 @@ const ingestSchema = z.object({
 export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
   const body = ingestSchema.safeParse(await request.json());
-  if (!body.success) return jsonError(400, "Invalid AI scribe payload");
+  if (!body.success) return jsonError(400, "Invalid AI scribe payload", "validation_error");
 
   const token = bearerToken(request);
-  if (!token) return jsonError(401, "Unauthorized");
+  if (!token) return jsonError(401, "Unauthorized", "unauthorized");
 
   const supabase = await createSupabaseActorClient(token);
   const permission = await requireAiScribePermission(supabase, id);
-  if (!permission.ok) return jsonError(permission.status, permission.message);
+  if (!permission.ok) return jsonError(permission.status, permission.message, permission.status === 404 ? "not_found" : "forbidden");
 
   const parsedTranscript = parseAiScribeTranscript(body.data.rawTranscript);
   const sourceTranscript = parsedTranscript.sourceTranscript;
   const gateway = await invokeSafeLlm(body.data.rawTranscript, "ai_scribe_structured_ingest");
   if (!gateway.ok) {
     return NextResponse.json(
-      { status: "needs_review", redaction: gateway.auditMetadata, providerError: gateway.providerError ?? null },
+      { status: "needs_review", code: gateway.code ?? "provider_error", redaction: gateway.auditMetadata, providerError: gateway.providerError ?? null },
       { status: 422 }
     );
   }
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     p_source_label: body.data.sourceLabel,
     p_segments: parsedTranscript.segments
   });
-  if (transcriptError) return jsonError(403, transcriptError.message);
+  if (transcriptError) return jsonError(403, "Transcript source could not be recorded.", "database_error", transcriptError);
 
   const persistedContent = JSON.stringify(buildAiScribeContent(
     gateway.response,
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     p_session_identifier: session.id
   });
 
-  if (error) return jsonError(403, error.message);
+  if (error) return jsonError(403, "AI scribe entry could not be persisted.", "database_error", error);
   const evidence = transcriptEvidenceSpan(sourceTranscript);
   const timestamps = transcriptTimestampForEvidence(evidence.charStart, sourceTranscript, parsedTranscript.segments);
   const { data: provenanceSpanId, error: provenanceError } = await supabase.rpc("create_provenance_for_transcript_span", {
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     p_transcript_start_ms: timestamps.startMs,
     p_transcript_end_ms: timestamps.endMs
   });
-  if (provenanceError) return jsonError(409, "AI summary was generated but source provenance did not validate.");
+  if (provenanceError) return jsonError(409, "AI summary was generated but source provenance did not validate.", "database_error", provenanceError);
 
   return NextResponse.json({
     entryId,

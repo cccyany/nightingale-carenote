@@ -15,9 +15,9 @@ export async function POST(
 ) {
   const { id } = await context.params;
   const token = bearerToken(request);
-  if (!token) return jsonError(401, "Unauthorized");
+  if (!token) return jsonError(401, "Unauthorized", "unauthorized");
   const body = commentSchema.safeParse(await request.json());
-  if (!body.success) return jsonError(400, "Invalid comment payload");
+  if (!body.success) return jsonError(400, "Invalid comment payload", "validation_error");
 
   const supabase = await createSupabaseActorClient(token);
   const { data, error } = await supabase.rpc("create_comment", {
@@ -27,6 +27,6 @@ export async function POST(
     p_mentions: body.data.mentions
   });
 
-  if (error) return jsonError(403, error.message);
+  if (error) return jsonError(403, "Comment could not be created.", "database_error", error);
   return NextResponse.json({ comment: data }, { status: 201 });
 }

@@ -16,9 +16,9 @@ export async function POST(
 ) {
   const { id } = await context.params;
   const token = bearerToken(request);
-  if (!token) return jsonError(401, "Unauthorized");
+  if (!token) return jsonError(401, "Unauthorized", "unauthorized");
   const body = taskSchema.safeParse(await request.json());
-  if (!body.success) return jsonError(400, "Invalid task payload");
+  if (!body.success) return jsonError(400, "Invalid task payload", "validation_error");
 
   const supabase = await createSupabaseActorClient(token);
   const { data, error } = await supabase.rpc("create_task", {
@@ -29,6 +29,6 @@ export async function POST(
     p_due_date: body.data.dueDate ?? null
   });
 
-  if (error) return jsonError(403, error.message);
+  if (error) return jsonError(403, "Task could not be created.", "database_error", error);
   return NextResponse.json({ task: data }, { status: 201 });
 }

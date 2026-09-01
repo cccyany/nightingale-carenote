@@ -24,7 +24,7 @@ flowchart LR
 
 Warm read path: `/api/patients/[id]/glance` calls the persisted `read_patient_glance` RPC. It returns only precomputed Glance fields, uses existing Supabase Auth/RLS scope, and performs no LLM call or extraction.
 
-Write/AI path: notes, comments, tasks, patient-facing drafts, AI-scribed entries, transcript capture, facts, conflicts, and feedback write durable rows. Runtime AI Scribe first authorizes the care-team actor, then redacts patient-derived text before the server-side Gemini 3.5 Flash provider call. Generated summaries remain unverified; provenance links the AI entry back to the original synthetic transcript/source span. Provenance spans and score components are computed before the warm consult read.
+Write/AI path: notes, comments, tasks, patient-facing drafts, AI-scribed entries, transcript capture, facts, conflicts, and feedback write durable rows. Runtime AI Scribe first authorizes the care-team actor, then redacts patient-derived text before the server-side Gemini 3.5 Flash provider call. Provider timeouts/unavailability fail safely without persisting fake AI output. Generated summaries remain unverified; provenance links the AI entry back to the original synthetic transcript/source span. Provenance spans and score components are computed before the warm consult read.
 
 Care Glance defaults to the top 3 presentable active items and can expand to a hard cap of 5; Jane currently has 5 presentable active items after golden-demo artifact filtering. Runtime AI Scribe cards show the full generated summary, while key points and provider metadata stay under AI details. Visible care-team timeline filters are All, AI Scribe, Clinician, Staff, and Patient; the underlying system author role remains supported for persisted AI/system entries.
 
@@ -59,7 +59,7 @@ The trust flow is:
 
 AI suggestion -> evidence-linked candidate -> deterministic rules -> human review -> clinician-confirmed/trusted care state.
 
-Entries store source timeline content. Versions preserve immutable snapshots. Comments and tasks support collaboration. Provenance sources/spans point to exact evidence offsets or transcript timestamps. Highlights and Glance items are the visible trust surface. Clinical facts and conflicts keep structured interpretations traceable without overwriting either side. Patient-facing content has an explicit approval state.
+Entries store source timeline content. Versions preserve immutable snapshots. Comments and tasks support collaboration. Provenance sources/spans point to exact evidence offsets or transcript timestamps. Highlights and Glance items are the visible trust surface. Clinical facts and conflicts keep structured interpretations traceable without overwriting either side. Patient-facing content can be manually authored or generated as an editable AI-assisted draft from selected care-record entries; it has an explicit approval state, source links, and reapproval after edits before becoming patient-visible again.
 
 Risk, importance, and evidence confidence are separate:
 
@@ -91,9 +91,9 @@ Tradeoffs:
 - Full revision snapshots instead of complex diff storage.
 - Deterministic risk floors instead of LLM severity.
 - Structured extraction instead of unconstrained clinical generation.
-- Bounded adaptive ranking instead of online model training.
+- Safety-bounded adaptive ranking instead of online model training; exposure bias is documented but not fully corrected.
 - Classification/ranking decay without destructive archival.
 - Mock/provider abstraction for external AI and transcription services.
 - Synthetic ambient voice capture demonstrates privacy architecture, not production diarization accuracy.
 
-Known assumptions: all demo data is synthetic; external AI/transcription credentials are optional; HOT/WARM/COLD is read/ranking behavior rather than physical archival; clinical evaluation remains out of scope for the prototype.
+Known assumptions: all demo data is synthetic; external AI/transcription credentials are optional; HOT/WARM/COLD is read/ranking behavior rather than physical archival; clinical evaluation remains out of scope for the prototype. Phone-only patient identity, production message delivery, real noisy ASR, multilingual robustness, and realtime streaming alerts are not implemented.

@@ -13,9 +13,9 @@ export async function POST(
 ) {
   const { id } = await context.params;
   const token = bearerToken(request);
-  if (!token) return jsonError(401, "Unauthorized");
+  if (!token) return jsonError(401, "Unauthorized", "unauthorized");
   const body = statusSchema.safeParse(await request.json());
-  if (!body.success) return jsonError(400, "Invalid task status payload");
+  if (!body.success) return jsonError(400, "Invalid task status payload", "validation_error");
 
   const supabase = await createSupabaseActorClient(token);
   const { data, error } = await supabase.rpc("set_task_status", {
@@ -23,6 +23,6 @@ export async function POST(
     p_status: body.data.status
   });
 
-  if (error) return jsonError(403, error.message);
+  if (error) return jsonError(403, "Task status could not be changed.", "database_error", error);
   return NextResponse.json({ task: data });
 }
