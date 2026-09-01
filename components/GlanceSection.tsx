@@ -3,7 +3,12 @@
 import Link from "next/link";
 import { useState } from "react";
 import type { GlanceItem } from "@/lib/carenote-data";
-import { activeGlanceBadge, defaultGlanceCount, maxGlanceCount } from "@/lib/glance-presentation";
+import {
+  defaultGlanceCount,
+  glanceViewBadge,
+  maxGlanceCount,
+  splitGlancePresentationItems
+} from "@/lib/glance-presentation";
 import { HighlightFeedbackButtons } from "./CareNoteActions";
 
 function displayToken(value: string) {
@@ -49,10 +54,18 @@ export function GlanceSection({
   items: GlanceItem[];
 }) {
   const [expanded, setExpanded] = useState(false);
-  const totalActiveItems = items.length;
-  const shownItems = totalActiveItems <= defaultGlanceCount
-    ? items
-    : items.slice(0, expanded ? maxGlanceCount : defaultGlanceCount);
+  const [view, setView] = useState<"active" | "confirmed">("active");
+  const splitItems = splitGlancePresentationItems(items);
+  const viewItems = view === "active" ? splitItems.active : splitItems.confirmed;
+  const totalViewItems = viewItems.length;
+  const shownItems = totalViewItems <= defaultGlanceCount
+    ? viewItems
+    : viewItems.slice(0, expanded ? maxGlanceCount : defaultGlanceCount);
+
+  function selectView(nextView: "active" | "confirmed") {
+    setView(nextView);
+    setExpanded(false);
+  }
 
   return (
     <section className="mt-5 rounded-md border border-teal-800 bg-white p-4 shadow-sm">
@@ -63,16 +76,32 @@ export function GlanceSection({
           <p className="mt-1 text-sm text-stone-600">Top ranked, source-linked items. The timeline remains the source of truth.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex rounded-md border border-stone-200 bg-stone-50 p-1 text-sm">
+            <button
+              className={`rounded px-3 py-1.5 font-medium focus:outline-none focus:ring-2 focus:ring-teal-600 ${view === "active" ? "bg-white text-teal-900 shadow-sm" : "text-stone-600 hover:text-stone-900"}`}
+              onClick={() => selectView("active")}
+              type="button"
+            >
+              Active {splitItems.active.length}
+            </button>
+            <button
+              className={`rounded px-3 py-1.5 font-medium focus:outline-none focus:ring-2 focus:ring-teal-600 ${view === "confirmed" ? "bg-white text-teal-900 shadow-sm" : "text-stone-600 hover:text-stone-900"}`}
+              onClick={() => selectView("confirmed")}
+              type="button"
+            >
+              Confirmed {splitItems.confirmed.length}
+            </button>
+          </div>
           <span className="rounded-full bg-teal-50 px-3 py-1 text-sm font-medium text-teal-900">
-            {activeGlanceBadge(totalActiveItems, shownItems.length)}
+            {glanceViewBadge(view, totalViewItems, shownItems.length)}
           </span>
-          {totalActiveItems > defaultGlanceCount ? (
+          {totalViewItems > defaultGlanceCount ? (
             <button
               className="rounded-md border border-teal-700 bg-white px-3 py-1.5 text-sm font-medium text-teal-900 hover:bg-teal-50 focus:outline-none focus:ring-2 focus:ring-teal-600"
               onClick={() => setExpanded((value) => !value)}
               type="button"
             >
-              {expanded ? "Show top 3" : "Show all active items"}
+              {expanded ? "Show top 3" : `Show all ${view} items`}
             </button>
           ) : null}
         </div>
@@ -135,7 +164,9 @@ export function GlanceSection({
             </div>
           </article>
         )) : (
-          <p className="rounded-md border border-stone-200 bg-white p-4 text-stone-600">No active Glance items.</p>
+          <p className="rounded-md border border-stone-200 bg-white p-4 text-stone-600">
+            {view === "active" ? "No active Glance items." : "No confirmed Glance items."}
+          </p>
         )}
       </div>
     </section>

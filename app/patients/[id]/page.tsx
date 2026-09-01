@@ -230,6 +230,7 @@ export default async function PatientPage({
   });
   const visibleGlance = presentableGlanceItems(result.glanceItems);
   const entryGroups = groupEntriesByDate(visibleEntries);
+  const canCreatePatientFacingDraft = actor?.role === "clinician" || actor?.role === "admin";
   const patientDraftSources = visibleEntries.map((entry) => ({
     id: entry.id,
     entry_type: entry.entry_type,
@@ -323,7 +324,17 @@ export default async function PatientPage({
                               <span>{entry.profiles?.display_name ?? (entry.author_role === "system" ? "System" : "Care team")}</span>
                               {aiMeta ? <strong className="rounded-full bg-amber-100 px-2.5 py-1 text-xs text-amber-950">{aiMeta.provider ? `${aiMeta.provider} - ` : ""}{displayToken(aiMeta.reviewState)}</strong> : null}
                               {!aiMeta && entry.author_role === "system" ? <strong className="rounded-full bg-amber-100 px-2.5 py-1 text-xs text-amber-950">Needs verification</strong> : null}
-                              <Link className="ml-auto rounded-md border border-stone-200 px-2.5 py-1 text-xs font-medium hover:bg-stone-50 focus:outline-none focus:ring-2 focus:ring-teal-600" href={`/patients/${id}/history?demo=${encodeURIComponent(demo)}&entry=${entry.id}`}>History</Link>
+                              <span className="ml-auto inline-flex flex-wrap items-center gap-2">
+                                {entry.author_role === "system" && canCreatePatientFacingDraft ? (
+                                  <Link
+                                    className="rounded-md border border-teal-700 px-2.5 py-1 text-xs font-medium text-teal-900 hover:bg-teal-50 focus:outline-none focus:ring-2 focus:ring-teal-600"
+                                    href={`/patients/${id}?demo=${encodeURIComponent(demo)}&patientDraftSource=${entry.id}#patient-facing-review`}
+                                  >
+                                    Patient draft
+                                  </Link>
+                                ) : null}
+                                <Link className="rounded-md border border-stone-200 px-2.5 py-1 text-xs font-medium hover:bg-stone-50 focus:outline-none focus:ring-2 focus:ring-teal-600" href={`/patients/${id}/history?demo=${encodeURIComponent(demo)}&entry=${entry.id}`}>History</Link>
+                              </span>
                             </div>
                             <div className="mt-3 text-sm leading-6 text-stone-800">
                               {showHighlight ? (
@@ -362,14 +373,6 @@ export default async function PatientPage({
                                   <p className="mt-2 text-stone-600">Transcript segment: {transcriptSpan.transcript_start_ms}ms-{transcriptSpan.transcript_end_ms}ms</p>
                                 ) : null}
                               </details>
-                            ) : null}
-                            {entry.author_role === "system" ? (
-                              <Link
-                                className="mt-3 inline-flex rounded-md border border-teal-700 px-2.5 py-1 text-xs font-medium text-teal-900 hover:bg-teal-50 focus:outline-none focus:ring-2 focus:ring-teal-600"
-                                href={`/patients/${id}?demo=${encodeURIComponent(demo)}&patientDraftSource=${entry.id}#patient-facing-review`}
-                              >
-                                Create patient-facing draft
-                              </Link>
                             ) : null}
                             {entry.author_role === "staff" || entry.author_role === "clinician" ? <EntryEditor entry={entry} /> : null}
                             <CommentComposer entryId={entry.id} users={assignableUsers} />

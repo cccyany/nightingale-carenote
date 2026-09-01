@@ -37,6 +37,9 @@ type GlancePresentationItem = {
   short_summary: string;
   risk_reason: string;
   rule_key: string | null;
+  status?: string | null;
+  confirmation_status?: string | null;
+  available_action?: string | null;
 };
 
 const validationNoisePatterns = [
@@ -99,6 +102,43 @@ export function presentableGlanceItems<T extends GlancePresentationItem>(items: 
     seen.add(key);
     return true;
   });
+}
+
+export function isConflictGlanceItem(item: GlancePresentationItem) {
+  return Boolean(item.rule_key?.includes("CONFLICT"));
+}
+
+export function isConfirmedGlanceItem(item: GlancePresentationItem) {
+  return item.status === "confirmed" || item.confirmation_status === "confirmed";
+}
+
+export function isActiveAttentionGlanceItem(item: GlancePresentationItem) {
+  if (item.status === "resolved" || item.status === "rejected") return false;
+  if (item.status === "needs_review") return true;
+  if (isConflictGlanceItem(item)) return true;
+  if (item.rule_key?.startsWith("UNRESOLVED")) return true;
+  if (item.available_action?.toLowerCase().includes("complete")) return true;
+  return false;
+}
+
+export function isConfirmedNonConflictGlanceItem(item: GlancePresentationItem) {
+  if (item.status === "resolved" || item.status === "rejected") return false;
+  return isConfirmedGlanceItem(item) && !isConflictGlanceItem(item);
+}
+
+export function splitGlancePresentationItems<T extends GlancePresentationItem>(items: T[]) {
+  return {
+    active: items.filter(isActiveAttentionGlanceItem),
+    confirmed: items.filter(isConfirmedNonConflictGlanceItem)
+  };
+}
+
+export function glanceViewBadge(view: "active" | "confirmed", totalItems: number, visibleItems: number) {
+  const noun = view === "active" ? "active item" : "confirmed item";
+  if (totalItems <= defaultGlanceCount) {
+    return `${totalItems} ${noun}${totalItems === 1 ? "" : "s"}`;
+  }
+  return `${totalItems} ${noun}s · showing ${visibleItems}`;
 }
 
 export function activeGlanceBadge(totalActiveItems: number, visibleGlanceItems: number) {

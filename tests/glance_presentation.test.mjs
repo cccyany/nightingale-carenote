@@ -3,13 +3,15 @@ import test from "node:test";
 
 import { activeGlanceBadge, presentableGlanceItems } from "../lib/glance-presentation.ts";
 
-function item(title, status = "needs_review") {
+function item(title, status = "needs_review", overrides = {}) {
   return {
     title,
     status,
+    confirmation_status: status,
     short_summary: `${title} summary`,
     risk_reason: `${title} reason`,
-    rule_key: title.toUpperCase().replaceAll(" ", "_")
+    rule_key: title.toUpperCase().replaceAll(" ", "_"),
+    ...overrides
   };
 }
 
