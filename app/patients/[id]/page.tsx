@@ -44,6 +44,11 @@ function displayToken(value: string) {
   return value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function patientContentStatusLabel(value: string) {
+  if (value === "needs_clinician_approval") return "Needs Approval";
+  return displayToken(value);
+}
+
 function age(value: string) {
   const birthDate = new Date(value);
   const now = new Date("2026-08-27T12:00:00+08:00");
@@ -137,6 +142,10 @@ function cleanDemoTitle(title: string) {
 
 function contentTypeLabel(value: string) {
   return displayToken(value || "general_update");
+}
+
+function countLabel(count: number, singular: string, plural = `${singular}s`) {
+  return `${count} ${count === 1 ? singular : plural}`;
 }
 
 function groupEntriesByDate(entries: CareNoteEntry[]) {
@@ -398,8 +407,12 @@ export default async function PatientPage({
           </section>
 
           <aside className="space-y-4">
-            <section className="rounded-md border border-stone-200 bg-white p-4 shadow-sm">
-              <h2 className="text-lg font-semibold">Conflict review</h2>
+            <details className="rounded-md border border-stone-200 bg-white shadow-sm">
+              <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-stone-800 hover:bg-stone-50">
+                <span>Conflict review</span>
+                <span className="ml-auto mr-2 rounded-full bg-stone-100 px-2.5 py-1 text-xs font-medium text-stone-600">{countLabel(visibleFactConflicts.length, "conflict")}</span>
+              </summary>
+              <section className="border-t border-stone-100 p-4">
               {visibleFactConflicts.length ? (
                 <div className="mt-3 space-y-3">
                   {visibleFactConflicts.map((conflict) => {
@@ -445,10 +458,15 @@ export default async function PatientPage({
               ) : (
                 <p className="mt-2 text-sm text-stone-600">No unresolved conflicts.</p>
               )}
-            </section>
+              </section>
+            </details>
 
-            <section className="rounded-md border border-stone-200 bg-white p-4 shadow-sm" id="patient-facing-review">
-              <h2 className="text-lg font-semibold">Patient-facing review</h2>
+            <details className="rounded-md border border-stone-200 bg-white shadow-sm" id="patient-facing-review" open={Boolean(patientDraftSourceId)}>
+              <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-stone-800 hover:bg-stone-50">
+                <span>Patient-facing review</span>
+                <span className="ml-auto mr-2 rounded-full bg-stone-100 px-2.5 py-1 text-xs font-medium text-stone-600">{countLabel(visiblePatientFacingContent.length, "item")}</span>
+              </summary>
+              <section className="border-t border-stone-100 p-4">
               <p className="mt-1 text-sm text-stone-600">Create patient-safe summaries or instructions from selected care-record sources. Drafts stay hidden until approved.</p>
               <PatientFacingDraftComposer patientId={id} actorRole={actor?.role} entries={patientDraftSources} initialSourceId={patientDraftSourceId} />
               {visiblePatientFacingContent.length ? (
@@ -457,7 +475,7 @@ export default async function PatientPage({
                     <div className="rounded border border-stone-200 p-3 text-sm" key={item.id}>
                       <div className="flex items-start justify-between gap-2">
                         <strong>{cleanDemoTitle(item.title)}</strong>
-                        <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs">{displayToken(item.status)}</span>
+                        <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs">{patientContentStatusLabel(item.status)}</span>
                       </div>
                       <p className="mt-1 text-xs font-medium text-stone-600">
                         {contentTypeLabel(item.content_type)} - {item.generation_method === "ai_assisted" ? "AI-assisted draft" : "Manually created"} - Based on {item.source_count} care-record {item.source_count === 1 ? "entry" : "entries"}
@@ -479,20 +497,25 @@ export default async function PatientPage({
                           </ul>
                         </details>
                       ) : null}
-                      <PatientContentStatusButtons contentId={item.id} status={item.status} title={item.title} body={item.body} />
+                      <PatientContentStatusButtons contentId={item.id} status={item.status} title={item.title} body={item.body} actorRole={actor?.role} />
                     </div>
                   ))}
                 </div>
               ) : (
                 <p className="mt-3 rounded border border-stone-200 bg-stone-50 p-3 text-sm text-stone-600">Nothing awaiting review.</p>
               )}
-            </section>
+              </section>
+            </details>
 
             <NoteComposer patientId={id} />
             <AiScribeComposer patientId={id} actorRole={actor?.role} />
             <TaskComposer patientId={id} users={assignableUsers} />
-            <section className="rounded-md border border-stone-200 bg-white p-4 shadow-sm">
-              <h2 className="text-lg font-semibold">Follow-up tasks</h2>
+            <details className="rounded-md border border-stone-200 bg-white shadow-sm">
+              <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-stone-800 hover:bg-stone-50">
+                <span>Follow-up tasks</span>
+                <span className="ml-auto mr-2 rounded-full bg-stone-100 px-2.5 py-1 text-xs font-medium text-stone-600">{countLabel(visibleTasks.length, "task")}</span>
+              </summary>
+              <section className="border-t border-stone-100 p-4">
               <div className="mt-3 space-y-2">
                 {visibleTasks.length ? visibleTasks.map((task) => (
                   <div className="rounded border border-stone-200 p-3 text-sm" key={task.id}>
@@ -508,7 +531,8 @@ export default async function PatientPage({
                   <p className="text-sm text-stone-600">No open follow-up tasks.</p>
                 )}
               </div>
-            </section>
+              </section>
+            </details>
           </aside>
         </div>
       </main>

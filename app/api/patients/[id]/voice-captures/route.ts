@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireAiScribePermission } from "@/lib/ai/authorization";
 import { invokeSafeLlm } from "@/lib/ai/safe-gateway";
 import { buildAiScribeContent, transcriptEvidenceSpan, transcriptTimestampForEvidence } from "@/lib/ai/scribe";
+import { persistRuntimeClinicalIntelligence } from "@/lib/ai/runtime-intelligence";
 import { bearerToken, jsonError } from "@/lib/http";
 import { createSupabaseActorClient } from "@/lib/supabase/request";
 import { DeterministicTranscriptionProvider, transcriptText } from "@/lib/voice/transcription";
@@ -70,10 +71,21 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
   });
   if (spanError) return jsonError(409, "AI summary was generated but source provenance did not validate.", "database_error", spanError);
 
+  const intelligence = await persistRuntimeClinicalIntelligence({
+    supabase,
+    patientId: id,
+    entryId,
+    sourceTranscript: rawTranscript,
+    sourceLabel: body.data.sourceLabel,
+    sessionIdentifier: session.id,
+    segments
+  });
+
   return NextResponse.json({
     transcriptSessionId: session.id,
     entryId,
     provenanceSpanId: spanId,
+    intelligence,
     provider: gateway.response.providerDisplayName,
     model: gateway.response.model ?? null,
     redaction: gateway.auditMetadata,

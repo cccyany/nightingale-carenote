@@ -8,6 +8,8 @@ ENTRY_CONTENT_PATTERNS = [
     "Patient denies penicillin allergy in updated note.%",
     "Synthetic patient-facing source %",
     "Synthetic patient-facing V1 source %",
+    "Runtime clinical intelligence %",
+    "Runtime version-bound source %",
 ]
 
 PATIENT_CONTENT_TITLE_PATTERNS = [
@@ -85,6 +87,9 @@ def cleanup_entry_artifacts(service: SupabaseSession) -> None:
         status, sources = service.get("provenance_sources", {"select": "id", "source_entry_id": f"in.({','.join(entry_ids)})"})
         assert status == 200, sources
         source_ids = _ids(sources)
+        status, entry_spans = service.get("provenance_spans", {"select": "id,source_id", "entry_id": f"in.({','.join(entry_ids)})"})
+        assert status == 200, entry_spans
+        source_ids = sorted(set(source_ids + [row["source_id"] for row in entry_spans if isinstance(row, dict) and row.get("source_id")]))
         if source_ids:
             status, spans = service.get("provenance_spans", {"select": "id", "source_id": f"in.({','.join(source_ids)})"})
             assert status == 200, spans

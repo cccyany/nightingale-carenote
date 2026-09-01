@@ -138,7 +138,7 @@ export default async function PatientMePage({
             <div className="mt-3 space-y-3">
               {uniqueApprovedContent.map((item) => (
                 <article className="rounded-md border border-teal-200 bg-white p-4 shadow-sm" key={`${item.title}-${item.approvedAt}`}>
-                  <p className="text-sm font-medium text-teal-800">Approved {dateTimeLabel(item.approvedAt)}</p>
+                  <p className="text-sm font-medium text-teal-800">{dateTimeLabel(item.approvedAt)}</p>
                   <h3 className="mt-1 font-semibold">{item.title}</h3>
                   <p className="mt-2 leading-6 text-stone-800">{item.body}</p>
                 </article>

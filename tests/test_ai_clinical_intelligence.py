@@ -359,3 +359,202 @@ def test_exact_penicillin_vs_no_known_allergies_conflict_reaches_glance(
     )
     assert status == 200, glance
     assert any(row["risk"] == "high" and row["status"] == "needs_review" for row in glance)
+
+
+def test_runtime_ai_scribe_intelligence_persists_idempotently_and_reranks(
+    clinician_session, service
+) -> None:
+    marker = str(uuid.uuid4())
+    source_text = (
+        f"Runtime clinical intelligence {marker}.\n"
+        "Patient: No known allergies.\n"
+        "Doctor: Repeat renal panel discussed.\n"
+        "Patient: Nocturnal cough for three weeks."
+    )
+    status, entry_id = clinician_session.rpc(
+        "ingest_ai_scribed_note",
+        {
+            "p_patient_id": JANE_PATIENT_ID,
+            "p_entry_type": "ai_doctor_consult_summary",
+            "p_content": source_text,
+            "p_source_label": "Runtime clinical intelligence test",
+            "p_session_identifier": f"runtime-{marker}",
+        },
+    )
+    assert status == 200, entry_id
+
+    allergy_start = source_text.index("No known allergies")
+    status, allergy_span = clinician_session.rpc(
+        "create_provenance_for_transcript_span",
+        {
+            "p_entry_id": entry_id,
+            "p_source_content": source_text,
+            "p_evidence_text": "No known allergies",
+            "p_char_start": allergy_start,
+            "p_char_end": allergy_start + len("No known allergies"),
+            "p_source_label": "Runtime clinical intelligence test",
+            "p_session_identifier": f"runtime-{marker}",
+            "p_transcript_start_ms": 1000,
+            "p_transcript_end_ms": 2500,
+        },
+    )
+    assert status == 200, allergy_span
+    status, repeated_allergy_span = clinician_session.rpc(
+        "create_provenance_for_transcript_span",
+        {
+            "p_entry_id": entry_id,
+            "p_source_content": source_text,
+            "p_evidence_text": "No known allergies",
+            "p_char_start": allergy_start,
+            "p_char_end": allergy_start + len("No known allergies"),
+            "p_source_label": "Runtime clinical intelligence test",
+            "p_session_identifier": f"runtime-{marker}",
+            "p_transcript_start_ms": 1000,
+            "p_transcript_end_ms": 2500,
+        },
+    )
+    assert status == 200, repeated_allergy_span
+    assert repeated_allergy_span == allergy_span
+
+    status, fact_id = clinician_session.rpc(
+        "upsert_fact_from_span",
+        {
+            "p_entry_id": entry_id,
+            "p_entity_type": "allergy",
+            "p_normalized_entity": "penicillin",
+            "p_value": None,
+            "p_unit": None,
+            "p_assertion": "absent",
+            "p_provenance_span_id": allergy_span,
+            "p_confidence": 0.75,
+            "p_review_status": "needs_review",
+            "p_extraction_method": "deterministic_runtime_ai_scribe",
+        },
+    )
+    assert status == 200, fact_id
+    status, repeated_fact_id = clinician_session.rpc(
+        "upsert_fact_from_span",
+        {
+            "p_entry_id": entry_id,
+            "p_entity_type": "allergy",
+            "p_normalized_entity": "penicillin",
+            "p_value": None,
+            "p_unit": None,
+            "p_assertion": "absent",
+            "p_provenance_span_id": allergy_span,
+            "p_confidence": 0.75,
+            "p_review_status": "needs_review",
+            "p_extraction_method": "deterministic_runtime_ai_scribe",
+        },
+    )
+    assert status == 200, repeated_fact_id
+    assert repeated_fact_id == fact_id
+
+    status, fact_rows = service.get(
+        "clinical_facts",
+        {"select": "authority_role,review_status,source_entry_id,source_version_id,provenance_span_id", "id": f"eq.{fact_id}"},
+    )
+    assert status == 200, fact_rows
+    assert fact_rows[0]["authority_role"] == "system"
+    assert fact_rows[0]["review_status"] == "needs_review"
+    assert fact_rows[0]["source_entry_id"] == entry_id
+    assert fact_rows[0]["source_version_id"]
+    assert fact_rows[0]["provenance_span_id"] == allergy_span
+
+    status, resolution = service.rpc("validate_provenance_span", {"p_span_id": allergy_span})
+    assert status == 200, resolution
+    assert resolution["ok"] is True
+    assert resolution["entry_id"] == entry_id
+    assert source_text[resolution["char_start"]:resolution["char_end"]] == "No known allergies"
+
+    renal_start = source_text.index("Repeat renal panel")
+    status, renal_span = clinician_session.rpc(
+        "create_provenance_for_transcript_span",
+        {
+            "p_entry_id": entry_id,
+            "p_source_content": source_text,
+            "p_evidence_text": "Repeat renal panel",
+            "p_char_start": renal_start,
+            "p_char_end": renal_start + len("Repeat renal panel"),
+            "p_source_label": "Runtime clinical intelligence test",
+            "p_session_identifier": f"runtime-{marker}",
+        },
+    )
+    assert status == 200, renal_span
+    status, runtime_glance = clinician_session.rpc(
+        "create_runtime_glance_candidate",
+        {
+            "p_patient_id": JANE_PATIENT_ID,
+            "p_provenance_span_id": renal_span,
+            "p_title": "Follow-up action to review",
+            "p_summary": "Repeat renal panel was captured from an unverified AI Scribe source.",
+            "p_rule_key": "UNRESOLVED_TASK",
+            "p_feature_key": "follow_up_action:repeat renal panel",
+            "p_risk": "medium",
+            "p_status": "needs_review",
+        },
+    )
+    assert status == 200, runtime_glance
+    status, repeated_runtime_glance = clinician_session.rpc(
+        "create_runtime_glance_candidate",
+        {
+            "p_patient_id": JANE_PATIENT_ID,
+            "p_provenance_span_id": renal_span,
+            "p_title": "Follow-up action to review",
+            "p_summary": "Repeat renal panel was captured from an unverified AI Scribe source.",
+            "p_rule_key": "UNRESOLVED_TASK",
+            "p_feature_key": "follow_up_action:repeat renal panel",
+            "p_risk": "medium",
+            "p_status": "needs_review",
+        },
+    )
+    assert status == 200, repeated_runtime_glance
+    assert repeated_runtime_glance["id"] == runtime_glance["id"]
+    assert repeated_runtime_glance["importance_score"] == runtime_glance["importance_score"]
+    assert runtime_glance["importance_score"] > 0
+
+    status, conflicts_created = clinician_session.rpc("detect_fact_conflicts_for_patient", {"p_patient_id": JANE_PATIENT_ID})
+    assert status == 200, conflicts_created
+    status, conflicts = clinician_session.get(
+        "fact_conflicts",
+        {
+            "select": "id,conflict_type,fact_a_id,fact_b_id,status",
+            "patient_id": f"eq.{JANE_PATIENT_ID}",
+        },
+    )
+    assert status == 200, conflicts
+    runtime_conflicts = [
+        conflict for conflict in conflicts
+        if fact_id in {conflict["fact_a_id"], conflict["fact_b_id"]}
+        and conflict["conflict_type"] == "ALLERGY_CONFLICT"
+    ]
+    assert runtime_conflicts
+    assert runtime_conflicts[0]["status"] == "unresolved"
+
+    status, first_rerank = clinician_session.rpc("rerank_patient_glance", {"p_patient_id": JANE_PATIENT_ID})
+    assert status == 200, first_rerank
+    status, before = clinician_session.get(
+        "glance_items",
+        {
+            "select": "id,title,importance_score,rule_key,risk,status",
+            "patient_id": f"eq.{JANE_PATIENT_ID}",
+            "provenance_span_id": f"eq.{renal_span}",
+        },
+    )
+    assert status == 200, before
+    status, second_rerank = clinician_session.rpc("rerank_patient_glance", {"p_patient_id": JANE_PATIENT_ID})
+    assert status == 200, second_rerank
+    status, after = clinician_session.get(
+        "glance_items",
+        {
+            "select": "id,title,importance_score,rule_key,risk,status",
+            "patient_id": f"eq.{JANE_PATIENT_ID}",
+            "provenance_span_id": f"eq.{renal_span}",
+        },
+    )
+    assert status == 200, after
+    assert after == before
+
+    status, risk = clinician_session.rpc("deterministic_risk_floor", {"p_rule_key": "ALLERGY_CONFLICT", "p_suggested": "low"})
+    assert status == 200, risk
+    assert risk == "high"

@@ -7,6 +7,30 @@ const statusSchema = z.object({
   status: z.enum(["approved", "rejected", "needs_clinician_approval", "draft"])
 });
 
+async function ensurePatientContentReviewer(supabase: Awaited<ReturnType<typeof createSupabaseActorClient>>, contentId: string) {
+  const { data: authUser, error: authError } = await supabase.auth.getUser();
+  if (authError || !authUser.user) return { ok: false as const, status: 401, message: "Unauthorized" };
+
+  const { data: content, error: contentError } = await supabase
+    .from("patient_facing_content")
+    .select("id, clinic_id")
+    .eq("id", contentId)
+    .single();
+  if (contentError || !content) return { ok: false as const, status: 404, message: "Patient-facing content was not found." };
+
+  const { data: membership, error: membershipError } = await supabase
+    .from("clinic_memberships")
+    .select("role")
+    .eq("clinic_id", content.clinic_id)
+    .eq("profile_id", authUser.user.id)
+    .in("role", ["clinician", "admin"])
+    .limit(1);
+  if (membershipError || !membership?.length) {
+    return { ok: false as const, status: 403, message: "Only clinicians and admins can change patient-facing publication state." };
+  }
+  return { ok: true as const };
+}
+
 export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
   const body = statusSchema.safeParse(await request.json());
@@ -14,6 +38,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
   const token = bearerToken(request);
   if (!token) return jsonError(401, "Unauthorized", "unauthorized");
   const supabase = await createSupabaseActorClient(token);
+  const reviewer = await ensurePatientContentReviewer(supabase, id);
+  if (!reviewer.ok) return jsonError(reviewer.status, reviewer.message, reviewer.status === 401 ? "unauthorized" : "forbidden");
   const { data, error } = await supabase.rpc("set_patient_content_status", {
     p_content_id: id,
     p_status: body.data.status

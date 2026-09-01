@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { invokeSafeLlm } from "@/lib/ai/safe-gateway";
-import { defaultPatientSummaryTitle, parsePatientSummaryResponse, patientContentTypes } from "@/lib/ai/patient-summary";
+import { clinicalSourceTextForPatientSummary, defaultPatientSummaryTitle, parsePatientSummaryResponse, patientContentTypes, patientSummaryInstruction, patientSummaryRelevance, serializePatientSummarySources } from "@/lib/ai/patient-summary";
 import { bearerToken, jsonError } from "@/lib/http";
 import { createSupabaseActorClient } from "@/lib/supabase/request";
 
-const sourceEntryIds = z.array(z.string().uuid()).min(1).max(8);
+const sourceEntryIds = z.array(z.string().uuid()).min(1).max(20);
 const contentType = z.enum(patientContentTypes);
 
 const requestSchema = z.discriminatedUnion("action", [
@@ -26,11 +26,6 @@ const requestSchema = z.discriminatedUnion("action", [
 
 function dateLabel(value: string) {
   return new Intl.DateTimeFormat("en-SG", { dateStyle: "medium", timeZone: "Asia/Singapore" }).format(new Date(value));
-}
-
-function sourceLabel(entry: { entry_type: string; author_role: string; occurred_at: string }) {
-  const label = entry.entry_type.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
-  return `${label} - ${dateLabel(entry.occurred_at)}`;
 }
 
 function isEligibleSource(entry: { entry_type: string; visibility: string }) {
@@ -86,23 +81,41 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
   if (!sources.ok) return jsonError(sources.status, sources.message, sources.status === 404 ? "not_found" : "forbidden");
 
   if (parsed.data.action === "generate") {
-    const sourceText = sources.entries
-      .map((entry, index) => [
-        `Source ${index + 1}: ${sourceLabel(entry)}`,
-        "Audience: patient",
-        "Use only supported source information. Preserve uncertainty and do not publish automatically.",
-        entry.content
-      ].join("\n"))
-      .join("\n\n");
+    if (sources.entries.some((entry) => !clinicalSourceTextForPatientSummary(entry).trim())) {
+      return jsonError(422, "AI draft could not be generated from the selected sources. You can adjust the sources, retry, or create the content manually.", "validation_error");
+    }
+    const relevance = patientSummaryRelevance(parsed.data.contentType, sources.entries);
+    if (!relevance.ok) {
+      return NextResponse.json(
+        { status: relevance.status, code: relevance.status, error: relevance.message, sourceCount: sources.entries.length },
+        { status: 422 }
+      );
+    }
+    const sourceText = [
+      "Audience: patient",
+      patientSummaryInstruction(parsed.data.contentType),
+      "Use only supported source information. Preserve uncertainty and do not publish automatically.",
+      "Do not include internal provider, model, JSON, audit, or review metadata.",
+      serializePatientSummarySources(sources.entries, dateLabel)
+    ].join("\n\n");
     const gateway = await invokeSafeLlm(sourceText, "patient_summary");
     if (!gateway.ok) {
+      const fallbackMessage = gateway.code === "provider_timeout" || gateway.code === "provider_unavailable"
+        ? undefined
+        : "AI draft could not be generated from the selected sources. You can adjust the sources, retry, or create the content manually.";
       return NextResponse.json(
-        { status: "needs_review", code: gateway.code ?? "provider_error", redaction: gateway.auditMetadata },
+        { status: "needs_review", code: gateway.code ?? "provider_error", error: fallbackMessage, redaction: gateway.auditMetadata },
         { status: 422 }
       );
     }
     const generated = parsePatientSummaryResponse(gateway.response);
-    if (!generated) return jsonError(422, "AI generation could not be completed safely.", "provider_error");
+    if (!generated) return jsonError(422, "AI draft could not be generated from the selected sources. You can adjust the sources, retry, or create the content manually.", "provider_error");
+    if (generated.status === "no_relevant_content") {
+      return NextResponse.json(
+        { status: generated.status, code: generated.status, error: generated.reason, sourceCount: sources.entries.length },
+        { status: 422 }
+      );
+    }
     return NextResponse.json({
       title: defaultPatientSummaryTitle(parsed.data.contentType, sources.entries.map((entry) => dateLabel(entry.occurred_at))),
       body: generated.summary,

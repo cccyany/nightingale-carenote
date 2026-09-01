@@ -111,7 +111,7 @@ type GeminiGenerateContentResponse = {
 
 function operationInstruction(operation: LlmOperation) {
   if (operation === "patient_summary") {
-    return "Produce a concise patient-facing draft summary. It must be suitable for clinician review before publication.";
+    return "Produce patient-facing draft content only when the selected sources contain relevant information for the requested output type. Return status generated when content is produced, or no_relevant_content with a short reason when the requested output type is not supported by the sources. It must be suitable for clinician review before publication.";
   }
   if (operation === "clinical_extraction") {
     return "Produce concise structured clinical extraction notes for deterministic downstream validation. Do not assign final risk or confidence.";
@@ -178,7 +178,9 @@ export class GeminiProvider implements LlmProvider {
             text: [
               `Operation: ${request.operation}.`,
               operationInstruction(request.operation),
-              "Return JSON with keys: summary, key_points, review_state.",
+              request.operation === "patient_summary"
+                ? "Return JSON with keys: status, summary, key_points, review_state, reason. Use status generated or no_relevant_content."
+                : "Return JSON with keys: summary, key_points, review_state.",
               "Set review_state to needs_review unless the source explicitly supports the statement.",
               "Redacted source text:",
               request.redactedText
@@ -194,9 +196,13 @@ export class GeminiProvider implements LlmProvider {
                 properties: {
                   summary: { type: "string" },
                   key_points: { type: "array", items: { type: "string" } },
-                  review_state: { type: "string" }
+                  review_state: { type: "string" },
+                  status: { type: "string" },
+                  reason: { type: "string" }
                 },
-                required: ["summary", "key_points", "review_state"]
+                required: request.operation === "patient_summary"
+                  ? ["key_points", "review_state"]
+                  : ["summary", "key_points", "review_state"]
               }
             }
           }

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { canSavePatientFacingDraft, patientSummarySourcePreview } from "@/lib/ai/patient-summary";
 
 type AssignableUser = {
   profile_id: string;
@@ -263,7 +264,12 @@ export function PatientFacingDraftComposer({
 
   const groups = groupDraftSourcesByDate(entries);
   const selectedEntries = entries.filter((entry) => selectedIds.includes(entry.id));
-  const canSave = Boolean(title.trim() && body.trim() && selectedIds.length);
+  const canSave = canSavePatientFacingDraft({ title, body, sourceEntryIds: selectedIds, contentType });
+  const missingFields = [
+    !selectedIds.length ? "select at least one source" : "",
+    !title.trim() ? "enter a title" : "",
+    !body.trim() ? "enter patient-facing body text" : ""
+  ].filter(Boolean);
 
   function toggleSource(entryId: string) {
     setSelectedIds((ids) => ids.includes(entryId) ? ids.filter((id) => id !== entryId) : [...ids, entryId]);
@@ -295,7 +301,7 @@ export function PatientFacingDraftComposer({
     const payload = await response.json().catch(() => ({}));
     setPending(null);
     if (!response.ok) {
-      setError(payload?.error ?? aiFailureMessage(payload?.code));
+      setError(payload?.error ?? (payload?.code ? aiFailureMessage(payload.code) : "AI draft could not be generated from the selected sources. You can adjust the sources, retry, or create the content manually."));
       return;
     }
     setTitle(payload.title ?? "");
@@ -307,9 +313,13 @@ export function PatientFacingDraftComposer({
   }
 
   async function saveDraft() {
-    setPending("save");
     setMessage("");
     setError("");
+    if (!canSave) {
+      setError(`Before saving, ${missingFields.join(", ")}.`);
+      return;
+    }
+    setPending("save");
     const response = await fetch(`/api/patients/${patientId}/patient-content`, {
       method: "POST",
       headers: authHeaders("clinician"),
@@ -377,7 +387,7 @@ export function PatientFacingDraftComposer({
                       <span>
                         <span className="block font-semibold text-stone-800">{sourceLabel(entry)} - {timeLabel(entry.occurred_at)}</span>
                         <span className="block text-stone-600">{entry.profiles?.display_name ?? (entry.author_role === "system" ? "System" : "Care team")} - version {entry.current_version}</span>
-                        <span className="mt-1 block text-stone-700">{preview(entry.content)}</span>
+                        <span className="mt-1 block text-stone-700">{patientSummarySourcePreview(entry)}</span>
                       </span>
                     </label>
                   ))}
@@ -427,6 +437,7 @@ export function PatientFacingDraftComposer({
             {mode === "generate" ? <button className={secondaryButtonClass} disabled={pending === "generate" || !selectedIds.length} onClick={generateDraft} type="button">Regenerate</button> : null}
             <button className={secondaryButtonClass} onClick={() => { resetDraft(); setSelectedIds([]); setOpen(false); }} type="button">Cancel</button>
           </div>
+          {!canSave && missingFields.length ? <p className="text-xs text-stone-600">Before saving, {missingFields.join(", ")}.</p> : null}
           {message ? <p className="rounded border border-teal-200 bg-teal-50 p-2 text-xs text-teal-950">{message}</p> : null}
           {error ? <p className="rounded border border-amber-300 bg-amber-50 p-2 text-xs text-amber-950">{error}</p> : null}
         </div>
@@ -658,12 +669,14 @@ export function PatientContentStatusButtons({
   contentId,
   status,
   title,
-  body
+  body,
+  actorRole
 }: {
   contentId: string;
   status: string;
   title: string;
   body: string;
+  actorRole?: string;
 }) {
   const router = useRouter();
   const [message, setMessage] = useState("");
@@ -672,13 +685,15 @@ export function PatientContentStatusButtons({
   const [draftTitle, setDraftTitle] = useState(title);
   const [draftBody, setDraftBody] = useState(body);
   const [editPending, setEditPending] = useState(false);
+  const canReview = actorRole === "clinician" || actorRole === "admin";
+  const reviewRole = actorRole === "admin" ? "admin" : "clinician";
 
   async function submit(nextStatus: "approved" | "rejected") {
     setPending(nextStatus);
     setMessage("");
     const response = await fetch(`/api/patient-content/${contentId}/status`, {
       method: "POST",
-      headers: authHeaders("clinician"),
+      headers: authHeaders(reviewRole),
       body: JSON.stringify({ status: nextStatus })
     });
     setPending(null);
@@ -692,7 +707,7 @@ export function PatientContentStatusButtons({
     setMessage("");
     const response = await fetch(`/api/patient-content/${contentId}`, {
       method: "PATCH",
-      headers: authHeaders("clinician"),
+      headers: authHeaders(reviewRole),
       body: JSON.stringify({ title: draftTitle, body: draftBody })
     });
     const payload = await response.json().catch(() => ({}));
@@ -702,12 +717,16 @@ export function PatientContentStatusButtons({
       return;
     }
     setEditing(false);
-    setMessage("Revised content now needs clinician approval.");
+    setMessage("Revised content now needs approval.");
     router.refresh();
   }
 
   const canApprove = status !== "approved";
   const canReject = status !== "rejected";
+
+  if (!canReview) {
+    return <p className="mt-2 text-xs text-stone-600">Staff can review sources; publication changes require clinician or admin review.</p>;
+  }
 
   return (
     <div className="mt-2 space-y-2">
@@ -739,7 +758,7 @@ export function PatientContentStatusButtons({
           <button className={`${primaryButtonClass} mt-2`} disabled={editPending || !draftTitle.trim() || !draftBody.trim()} onClick={saveRevision} type="button">
             {editPending ? "Saving..." : "Save revision"}
           </button>
-          <p className="mt-1 text-xs text-stone-600">Saving a revision always requires a fresh clinician decision.</p>
+          <p className="mt-1 text-xs text-stone-600">Saving a revision always requires a fresh reviewer decision.</p>
         </div>
       ) : null}
       {message ? <span className="text-xs text-stone-600">{message}</span> : null}

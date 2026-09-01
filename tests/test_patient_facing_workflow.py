@@ -22,6 +22,16 @@ def patient_session():
 
 
 @pytest.fixture(scope="module")
+def staff_session():
+    return sign_in("staff.a@example.test")
+
+
+@pytest.fixture(scope="module")
+def admin_session():
+    return sign_in("admin.a@example.test")
+
+
+@pytest.fixture(scope="module")
 def clinic_b_staff_session():
     return sign_in("staff.b@example.test")
 
@@ -154,6 +164,60 @@ def test_multiple_sources_and_partial_date_selection_store_only_selected_entries
     assert draft["source_count"] == 2
 
 
+def test_one_date_multiple_source_generation_preserves_each_source_version(clinician_session, service) -> None:
+    selected = [
+        _create_source(clinician_session, f"Synthetic patient-facing source one-date {index} {uuid.uuid4()}", f"2026-08-26T0{index + 8}:00:00+08:00")
+        for index in range(3)
+    ]
+
+    draft = _draft(
+        clinician_session,
+        [entry["id"] for entry in selected],
+        "Synthetic multi-source patient draft",
+        "ai_assisted",
+    )
+    links = _source_links(service, draft["id"])
+
+    assert [row["source_entry_id"] for row in links] == [entry["id"] for entry in selected]
+    assert draft["source_count"] == 3
+    assert all(row["source_version_id"] for row in links)
+    assert all(row["provenance_span_id"] for row in links)
+
+
+def test_two_date_multiple_source_generation_preserves_selection_order_and_versions(clinician_session, service) -> None:
+    aug_28_a = _create_source(clinician_session, f"Synthetic patient-facing source two-date 28a {uuid.uuid4()}", "2026-08-28T09:00:00+08:00")
+    aug_26_a = _create_source(clinician_session, f"Synthetic patient-facing source two-date 26a {uuid.uuid4()}", "2026-08-26T09:00:00+08:00")
+    aug_28_b = _create_source(clinician_session, f"Synthetic patient-facing source two-date 28b {uuid.uuid4()}", "2026-08-28T09:30:00+08:00")
+    selected_ids = [aug_28_a["id"], aug_26_a["id"], aug_28_b["id"]]
+
+    draft = _draft(clinician_session, selected_ids, "Synthetic multi-source patient draft", "ai_assisted")
+    links = _source_links(service, draft["id"])
+
+    assert [row["source_entry_id"] for row in links] == selected_ids
+    assert draft["source_count"] == len(selected_ids)
+    assert all(row["source_version_id"] for row in links)
+
+
+def test_three_date_mixed_source_generation_links_only_selected_entries(clinician_session, service) -> None:
+    selected = [
+        _create_ai_source(clinician_session, f"Synthetic patient-facing source AI longitudinal {uuid.uuid4()}"),
+        _create_source(clinician_session, f"Synthetic patient-facing source three-date 26 {uuid.uuid4()}", "2026-08-26T11:00:00+08:00")["id"],
+        _create_source(clinician_session, f"Synthetic patient-facing source three-date 25 {uuid.uuid4()}", "2026-08-25T12:00:00+08:00")["id"],
+    ]
+    unselected = _create_source(clinician_session, f"Synthetic patient-facing source three-date unselected {uuid.uuid4()}", "2026-08-28T13:00:00+08:00")
+
+    draft = _draft(clinician_session, selected, "Synthetic multi-source patient draft", "ai_assisted")
+    links = _source_links(service, draft["id"])
+
+    assert [row["source_entry_id"] for row in links] == selected
+    assert unselected["id"] not in {row["source_entry_id"] for row in links}
+    assert draft["source_count"] == 3
+    for link in links:
+      status, validation = service.rpc("validate_provenance_span", {"p_span_id": link["provenance_span_id"]})
+      assert status == 200, validation
+      assert validation["ok"] is True
+
+
 def test_source_version_provenance_survives_source_edit(clinician_session, service) -> None:
     original = f"Synthetic patient-facing V1 source original {uuid.uuid4()}"
     source = _create_source(clinician_session, original)
@@ -228,3 +292,80 @@ def test_clinic_b_cannot_create_or_view_jane_patient_content(clinic_b_staff_sess
     status, rows = clinic_b_staff_session.get("patient_facing_content", {"select": "id", "id": f"eq.{draft['id']}"})
     assert status == 200
     assert rows == []
+
+
+def test_staff_can_view_patient_facing_queue_sources_but_cannot_mutate_publication_state(clinician_session, staff_session, service) -> None:
+    source = _create_source(clinician_session, f"Synthetic patient-facing source staff readonly {uuid.uuid4()}")
+    draft = _draft(
+        clinician_session,
+        [source["id"]],
+        "Synthetic manual patient draft",
+        "manual",
+        "Patient-friendly synthetic draft for staff read-only permission test.",
+    )
+
+    status, staff_rows = staff_session.get(
+        "patient_facing_content",
+        {"select": "id,status,title", "id": f"eq.{draft['id']}"},
+    )
+    assert status == 200
+    assert staff_rows == [{"id": draft["id"], "status": "needs_clinician_approval", "title": draft["title"]}]
+
+    links = _source_links(service, draft["id"])
+    status, staff_links = staff_session.get(
+        "patient_content_sources",
+        {"select": "source_entry_id,source_version_id,provenance_span_id", "patient_content_id": f"eq.{draft['id']}"},
+    )
+    assert status == 200
+    assert staff_links == [
+        {
+            "source_entry_id": links[0]["source_entry_id"],
+            "source_version_id": links[0]["source_version_id"],
+            "provenance_span_id": links[0]["provenance_span_id"],
+        }
+    ]
+
+    status, blocked_status = staff_session.rpc("set_patient_content_status", {"p_content_id": draft["id"], "p_status": "approved"})
+    assert status in {400, 403}, blocked_status
+
+    status, blocked_edit = staff_session.rpc(
+        "update_patient_facing_content",
+        {"p_content_id": draft["id"], "p_title": draft["title"], "p_body": "Staff must not revise patient-facing content."},
+    )
+    assert status in {400, 403}, blocked_edit
+
+    status, blocked_create = staff_session.rpc(
+        "create_patient_facing_draft_from_sources",
+        {
+            "p_patient_id": JANE_PATIENT_ID,
+            "p_source_entry_ids": [source["id"]],
+            "p_content_type": "visit_summary",
+            "p_generation_method": "manual",
+            "p_title": f"Synthetic manual patient draft {uuid.uuid4()}",
+            "p_body": "Staff must not create patient-facing content.",
+        },
+    )
+    assert status in {400, 403}, blocked_create
+
+
+def test_admin_retains_patient_facing_create_revise_and_approval_permissions(admin_session, clinician_session) -> None:
+    source = _create_source(clinician_session, f"Synthetic patient-facing source admin permissions {uuid.uuid4()}")
+    draft = _draft(
+        admin_session,
+        [source["id"]],
+        "Synthetic manual patient draft",
+        "manual",
+        "Admin-created patient-facing draft.",
+    )
+    assert draft["status"] == "needs_clinician_approval"
+
+    status, edited = admin_session.rpc(
+        "update_patient_facing_content",
+        {"p_content_id": draft["id"], "p_title": draft["title"], "p_body": "Admin-revised patient-facing draft."},
+    )
+    assert status == 200, edited
+    assert edited["status"] == "needs_clinician_approval"
+
+    status, approved = admin_session.rpc("set_patient_content_status", {"p_content_id": draft["id"], "p_status": "approved"})
+    assert status == 200, approved
+    assert approved["status"] == "approved"
