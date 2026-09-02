@@ -87,3 +87,38 @@ test("symptom extraction preserves declarative clinician note evidence", () => {
   assert.equal(symptom.assertion, "present");
   assert.equal(symptom.reviewState, "suggested");
 });
+
+test("dosage extraction recognizes compact mg and milligram variants as mg", () => {
+  for (const content of [
+    "I take metformin 500 mg twice a day.",
+    "I take metformin 500 milligram twice a day.",
+    "I take metformin 500 milligrams twice a day."
+  ]) {
+    const candidates = extractStructuredCandidates({ entryId: "entry-1", content, authorRole: "system" });
+    const dosage = candidates.find((candidate) => candidate.candidateType === "dosage");
+
+    assert.ok(dosage, content);
+    assert.equal(dosage.normalizedValue, "metformin");
+    assert.equal(dosage.value, "500");
+    assert.equal(dosage.unit, "mg");
+    assert.equal(content.slice(dosage.charStart, dosage.charEnd), dosage.sourceEvidenceText);
+  }
+});
+
+test("dosage extraction keeps medication extraction and ignores unrelated numeric text", () => {
+  const medicationCandidates = extractStructuredCandidates({
+    entryId: "entry-1",
+    content: "I take metformin 500 milligrams twice a day.",
+    authorRole: "system"
+  });
+
+  assert.ok(medicationCandidates.some((candidate) => candidate.candidateType === "medication" && candidate.normalizedValue === "metformin"));
+
+  const unrelatedCandidates = extractStructuredCandidates({
+    entryId: "entry-1",
+    content: "Patient walked 500 meters yesterday and drank 500 milliliters of water.",
+    authorRole: "system"
+  });
+
+  assert.equal(unrelatedCandidates.some((candidate) => candidate.candidateType === "dosage"), false);
+});

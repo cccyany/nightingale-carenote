@@ -115,12 +115,13 @@ export function extractStructuredCandidates(input: ExtractInput): StructuredCand
     });
   }
 
-  for (const match of content.matchAll(/\b(metformin|lisinopril|atorvastatin)\s+(\d+(?:\.\d+)?)\s*(mg|mcg|g)\b/gi)) {
+  for (const match of content.matchAll(/\b(metformin|lisinopril|atorvastatin)\s+(\d+(?:\.\d+)?)\s*(mg|milligrams?|mcg|g)\b/gi)) {
+    const unit = /^milligrams?$/i.test(match[3]) ? "mg" : match[3].toLowerCase();
     candidates.push({
       ...candidateBase(input, match as RegExpExecArray, match[1].toLowerCase()),
       candidateType: "dosage",
       value: match[2],
-      unit: match[3].toLowerCase(),
+      unit,
       assertion: "present",
       evidenceExplanation: "Medication dose captured with exact source span."
     });
