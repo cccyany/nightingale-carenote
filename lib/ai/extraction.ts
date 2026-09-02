@@ -53,6 +53,17 @@ function candidateBase(input: ExtractInput, match: RegExpExecArray, normalizedVa
   };
 }
 
+function lineContainingRange(content: string, start: number, end: number) {
+  const lineStart = content.lastIndexOf("\n", start - 1) + 1;
+  const nextNewline = content.indexOf("\n", end);
+  const lineEnd = nextNewline >= 0 ? nextNewline : content.length;
+  return content.slice(lineStart, lineEnd).trim();
+}
+
+function isQuestionFormMention(content: string, match: RegExpExecArray) {
+  return /\?\s*$/.test(lineContainingRange(content, match.index, match.index + match[0].length));
+}
+
 export function extractStructuredCandidates(input: ExtractInput): StructuredCandidate[] {
   const candidates: StructuredCandidate[] = [];
   const content = input.content;
@@ -125,6 +136,7 @@ export function extractStructuredCandidates(input: ExtractInput): StructuredCand
   }
 
   for (const match of content.matchAll(/\b(nocturnal cough|cough|dizziness|shortness of breath)\b/gi)) {
+    if (isQuestionFormMention(content, match as RegExpExecArray)) continue;
     candidates.push({
       ...candidateBase(input, match as RegExpExecArray, match[0].toLowerCase()),
       candidateType: "symptom",

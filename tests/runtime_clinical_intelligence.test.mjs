@@ -142,6 +142,31 @@ test("runtime AI Scribe does not create Glance cards for low-value unsupported t
   assert.equal(supabase.calls.filter((call) => call.name === "create_runtime_glance_candidate").length, 0);
 });
 
+test("runtime AI Scribe does not promote symptom mentions from question-form transcript lines", async () => {
+  const supabase = fakeSupabase();
+  const sourceTranscript = [
+    "Speaker 0: Today ate a shortness of breath or chest pain?",
+    "Speaker 1: No chest pain. Nafis okay. But yesterday I felt a bit dizzy."
+  ].join("\n");
+
+  const result = await persistRuntimeClinicalIntelligence({
+    supabase,
+    patientId: "patient-1",
+    entryId: "entry-1",
+    sourceTranscript,
+    sourceLabel: "Runtime multilingual transcript",
+    sessionIdentifier: "session-1",
+    segments: [
+      { id: "segment-question", speaker: "unknown", display_speaker: "Speaker 0", start_ms: 11200, end_ms: 13800, text: "Today ate a shortness of breath or chest pain?" },
+      { id: "segment-answer", speaker: "unknown", display_speaker: "Speaker 1", start_ms: 15200, end_ms: 21600, text: "No chest pain. Nafis okay. But yesterday I felt a bit dizzy." }
+    ]
+  });
+
+  assert.equal(result.ok, true);
+  const symptomGlanceCalls = supabase.calls.filter((call) => call.name === "create_runtime_glance_candidate" && call.params.p_feature_key === "symptom:shortness of breath");
+  assert.equal(symptomGlanceCalls.length, 0);
+});
+
 test("runtime AI Scribe returns safe failure if provenance persistence fails", async () => {
   const calls = [];
   const supabase = {

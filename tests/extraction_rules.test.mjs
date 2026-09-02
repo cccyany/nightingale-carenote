@@ -54,3 +54,36 @@ test("contextual allergy extraction rejects unrelated penicillin mentions", () =
     assert.equal(candidates.some((candidate) => candidate.candidateType === "allergy" && candidate.assertion === "present"), false, content);
   }
 });
+
+test("symptom extraction skips question-form mentions", () => {
+  const candidates = extractStructuredCandidates({
+    entryId: "entry-1",
+    content: "Speaker 0: Any shortness of breath?",
+    authorRole: "system"
+  });
+
+  assert.equal(candidates.some((candidate) => candidate.candidateType === "symptom" && candidate.normalizedValue === "shortness of breath"), false);
+});
+
+test("symptom question does not suppress positive patient answer", () => {
+  const content = [
+    "Speaker 0: Any dizziness?",
+    "Speaker 1: Yes, I felt dizziness yesterday."
+  ].join("\n");
+  const candidates = extractStructuredCandidates({ entryId: "entry-1", content, authorRole: "system" });
+  const symptoms = candidates.filter((candidate) => candidate.candidateType === "symptom" && candidate.normalizedValue === "dizziness");
+
+  assert.equal(symptoms.length, 1);
+  assert.equal(symptoms[0].sourceEvidenceText, "dizziness");
+  assert.equal(content.slice(symptoms[0].charStart, symptoms[0].charEnd), "dizziness");
+});
+
+test("symptom extraction preserves declarative clinician note evidence", () => {
+  const content = "Doctor note: Patient reports shortness of breath.";
+  const candidates = extractStructuredCandidates({ entryId: "entry-1", content, authorRole: "clinician" });
+  const symptom = candidates.find((candidate) => candidate.candidateType === "symptom" && candidate.normalizedValue === "shortness of breath");
+
+  assert.ok(symptom);
+  assert.equal(symptom.assertion, "present");
+  assert.equal(symptom.reviewState, "suggested");
+});
