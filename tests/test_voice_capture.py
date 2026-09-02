@@ -104,6 +104,11 @@ def test_voice_transcript_session_ai_entry_and_timestamp_provenance_persist(staf
         },
     )
     assert status == 200, entry_id
+    status, segments = service.get("transcript_segments", {"select": "id,speaker,start_ms,end_ms,text,uncertain", "session_id": f"eq.{session['id']}", "order": "start_ms.asc"})
+    assert status == 200, segments
+    assert [segment["speaker"] for segment in segments] == ["patient", "clinician"]
+    assert segments[1]["uncertain"] is True
+
     status, span_id = staff_session.rpc(
         "create_voice_provenance_for_transcript_span",
         {
@@ -116,6 +121,7 @@ def test_voice_transcript_session_ai_entry_and_timestamp_provenance_persist(staf
             "p_source_label": "Synthetic ambient consult test",
             "p_transcript_start_ms": 1200,
             "p_transcript_end_ms": 4200,
+            "p_transcript_segment_id": segments[0]["id"],
         },
     )
     assert status == 200, span_id
@@ -125,11 +131,18 @@ def test_voice_transcript_session_ai_entry_and_timestamp_provenance_persist(staf
     assert resolution["ok"] is True
     assert resolution["char_start"] == 0
     assert resolution["char_end"] == 35
+    assert resolution["transcript_segment_id"] == segments[0]["id"]
 
-    status, segments = service.get("transcript_segments", {"select": "speaker,start_ms,end_ms,uncertain", "session_id": f"eq.{session['id']}", "order": "start_ms.asc"})
-    assert status == 200, segments
-    assert [segment["speaker"] for segment in segments] == ["patient", "clinician"]
-    assert segments[1]["uncertain"] is True
+    status, span = service.get(
+        "provenance_spans",
+        {
+            "select": "id,evidence_text,transcript_segment_id,transcript_segments:transcript_segment_id(text,start_ms,end_ms,raw_speaker_label,display_speaker)",
+            "id": f"eq.{span_id}",
+        },
+    )
+    assert status == 200, span
+    assert span[0]["transcript_segment_id"] == segments[0]["id"]
+    assert span[0]["transcript_segments"]["text"] == "Synthetic cough discussed."
 
 
 def test_clinical_staff_can_create_voice_session_but_other_clinic_and_patient_cannot(

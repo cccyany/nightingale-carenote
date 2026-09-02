@@ -34,6 +34,15 @@ export type CareNoteEntry = {
     evidence_text: string;
     transcript_start_ms: number | null;
     transcript_end_ms: number | null;
+    transcript_segment_id: string | null;
+    transcript_segments?: {
+      text: string;
+      raw_speaker_label: string | null;
+      display_speaker: string | null;
+      semantic_speaker_role: string | null;
+      start_ms: number;
+      end_ms: number;
+    } | null;
     provenance_sources: {
       source_kind: string;
       source_label: string;
@@ -81,11 +90,12 @@ export type GlanceItem = {
   evidence_label: string;
   evidence_explanation: string;
   rule_key: string | null;
-  provenance_spans: {
+    provenance_spans: {
     entry_id: string | null;
     char_start: number | null;
     char_end: number | null;
     evidence_text: string;
+    transcript_segment_id?: string | null;
     provenance_sources: { source_label: string } | null;
   } | null;
 };
@@ -100,11 +110,12 @@ export type ClinicalFact = {
   evidence_confidence: number;
   review_status: string;
   provenance_span_id: string;
-  provenance_spans: {
+    provenance_spans: {
     entry_id: string | null;
     char_start: number | null;
     char_end: number | null;
     evidence_text: string;
+    transcript_segment_id?: string | null;
   } | null;
 };
 export type FactConflict = {
@@ -222,7 +233,7 @@ const entrySelect = `
   created_at,
   updated_at,
   profiles:author_id(display_name),
-  provenance_spans(id, char_start, char_end, evidence_text, transcript_start_ms, transcript_end_ms, provenance_sources:source_id(source_kind, source_label, source_content, source_session_identifier))
+  provenance_spans(id, char_start, char_end, evidence_text, transcript_start_ms, transcript_end_ms, transcript_segment_id, transcript_segments:transcript_segment_id(text, raw_speaker_label, display_speaker, semantic_speaker_role, start_ms, end_ms), provenance_sources:source_id(source_kind, source_label, source_content, source_session_identifier))
 `;
 
 async function careReadClient(actorToken?: string) {
@@ -286,13 +297,13 @@ export async function getPatientCareNote(patientId: string, filter: TimelineFilt
       ),
       supabase
         .from("glance_items")
-        .select("id, highlight_id, title, short_summary, status, risk, risk_reason, importance_score, importance_reasons, storage_class, ranking_explanation, provenance_span_id, available_action, confirmation_status, evidence_label, evidence_explanation, rule_key, provenance_spans:provenance_span_id(entry_id, char_start, char_end, evidence_text, provenance_sources:source_id(source_label))")
+        .select("id, highlight_id, title, short_summary, status, risk, risk_reason, importance_score, importance_reasons, storage_class, ranking_explanation, provenance_span_id, available_action, confirmation_status, evidence_label, evidence_explanation, rule_key, provenance_spans:provenance_span_id(entry_id, char_start, char_end, evidence_text, transcript_segment_id, provenance_sources:source_id(source_label))")
         .eq("patient_id", patientId)
         .not("status", "in", "(rejected,resolved)")
         .order("importance_score", { ascending: false }),
       supabase
         .from("clinical_facts")
-        .select("id, entity_type, normalized_entity, value, unit, assertion, authority_role, evidence_confidence, review_status, provenance_span_id, provenance_spans:provenance_span_id(entry_id, char_start, char_end, evidence_text)")
+        .select("id, entity_type, normalized_entity, value, unit, assertion, authority_role, evidence_confidence, review_status, provenance_span_id, provenance_spans:provenance_span_id(entry_id, char_start, char_end, evidence_text, transcript_segment_id)")
         .eq("patient_id", patientId)
         .order("created_at", { ascending: false })
         .limit(100),

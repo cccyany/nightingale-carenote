@@ -29,30 +29,37 @@ test("deterministic transcription normalizes speaker labels and timestamps", asy
 
 test("Gemini transcription adapter sends audio to dedicated transcription model and normalizes response", async () => {
   const originalFetch = globalThis.fetch;
-  let requestBody = "";
+  const requests = [];
   try {
     globalThis.fetch = async (url, init) => {
-      assert.match(String(url), /gemini-3\.5-transcribe:generateContent/);
-      requestBody = String(init?.body ?? "");
+      requests.push({ url: String(url), body: init?.body, headers: init?.headers });
+      if (String(url).includes("/upload/v1beta/files") && init?.headers?.["x-goog-upload-command"] === "start") {
+        return new Response(null, { status: 200, headers: { "X-Goog-Upload-URL": "https://upload.example/session" } });
+      }
+      if (String(url) === "https://upload.example/session") {
+        assert.equal(init?.headers?.["x-goog-upload-command"], "upload, finalize");
+        return new Response(JSON.stringify({
+          file: { name: "files/test-audio", uri: "files/test-audio", mimeType: "audio/webm" }
+        }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      assert.match(String(url), /\/v1beta\/interactions/);
+      const body = JSON.parse(String(init?.body ?? "{}"));
+      assert.equal(body.model, "gemini-3.5-transcribe");
+      assert.equal(body.input[0].uri, "files/test-audio");
+      assert.equal(body.input[0].mime_type, "audio/webm");
       return new Response(JSON.stringify({
-        candidates: [{
-          content: {
-            parts: [{
-              text: JSON.stringify({
-                language_info: { languages: ["en", "ms"] },
-                segments: [{
-                  speaker: "Speaker 1",
-                  raw_speaker_label: "Speaker 1",
-                  display_speaker: "Speaker 1",
-                  start_ms: 1200,
-                  end_ms: 4200,
-                  text: "Ada cough at night.",
-                  confidence: 0.66,
-                  uncertain: false
-                }]
-              })
+        steps: [{
+          content: [{
+            type: "text",
+            text: "Ada cough at night.",
+            annotations: [{
+              type: "word_info",
+              text: "Ada cough at night.",
+              speaker: "spk:1",
+              start_offset: "1.200s",
+              end_offset: "4.200s"
             }]
-          }
+          }]
         }]
       }), { status: 200, headers: { "content-type": "application/json" } });
     };
@@ -60,12 +67,17 @@ test("Gemini transcription adapter sends audio to dedicated transcription model 
     const provider = new GeminiTranscriptionProvider("synthetic-key", "gemini-3.5-transcribe", 1000);
     const result = await provider.transcribe({ audio: new Uint8Array([1, 2, 3]).buffer, mimeType: "audio/webm" });
 
-    assert.match(requestBody, /inline_data/);
-    assert.match(requestBody, /audio\/webm/);
+    assert.equal(requests.length, 3);
+    assert.match(requests[0].url, /\/upload\/v1beta\/files/);
+    assert.equal(requests[1].url, "https://upload.example/session");
+    assert.match(requests[2].url, /\/v1beta\/interactions/);
     assert.equal(result.provider, "gemini");
     assert.equal(result.model, "gemini-3.5-transcribe");
     assert.equal(result.segments[0].speaker, "unknown");
+    assert.equal(result.segments[0].raw_speaker_label, "spk:1");
     assert.equal(result.segments[0].display_speaker, "Speaker 1");
+    assert.equal(result.segments[0].start_ms, 1200);
+    assert.equal(result.segments[0].end_ms, 4200);
     assert.equal(result.segments[0].uncertain, true);
   } finally {
     globalThis.fetch = originalFetch;

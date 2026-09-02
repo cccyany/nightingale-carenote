@@ -174,6 +174,18 @@ function firstTranscriptSpan(entry: CareNoteEntry) {
   return entry.provenance_spans?.find((span) => span.provenance_sources?.source_kind === "transcript" && span.provenance_sources.source_content) ?? null;
 }
 
+function directTranscriptSegment(span: NonNullable<CareNoteEntry["provenance_spans"]>[number] | null) {
+  const segment = span?.transcript_segments;
+  if (!segment) return null;
+  return {
+    label: segment.display_speaker ?? segment.raw_speaker_label ?? segment.semantic_speaker_role ?? "unknown",
+    rawLabel: segment.raw_speaker_label,
+    text: segment.text,
+    startMs: segment.start_ms,
+    endMs: segment.end_ms
+  };
+}
+
 export default async function PatientPage({
   params,
   searchParams
@@ -313,6 +325,8 @@ export default async function PatientPage({
                         const transcriptDisplay = transcriptSpan
                           ? transcriptSourceForDisplay(transcriptSource, transcriptSpan.char_start, transcriptSpan.char_end)
                           : null;
+                        const transcriptSegment = directTranscriptSegment(transcriptSpan);
+                        const segmentEvidenceStart = transcriptSegment && transcriptSpan ? transcriptSegment.text.indexOf(transcriptSpan.evidence_text.replace(/^[^:]+:\s*/, "")) : -1;
                         return (
                           <article
                             className={`scroll-mt-24 rounded-md border p-4 ${entryTone(entry.author_role)} ${sourceEntryId === entry.id ? "ring-2 ring-amber-400" : ""}`}
@@ -367,9 +381,23 @@ export default async function PatientPage({
                               <details className={`mt-3 rounded border p-3 text-xs ${sourceEntryId === entry.id ? "border-amber-300 bg-amber-50" : "border-amber-200 bg-white/70"}`} open={sourceEntryId === entry.id}>
                                 <summary className="cursor-pointer font-semibold text-stone-800">Review source</summary>
                                 <p className="mt-2 text-stone-600">Source transcript. Highlighted text is exact source evidence; the generated summary remains needs verification.</p>
-                                <div className="mt-2 max-h-52 overflow-auto rounded border border-stone-200 bg-white p-3 text-sm leading-6 text-stone-800">
-                                  <EvidenceText content={transcriptDisplay?.content ?? transcriptSource} evidenceStart={transcriptDisplay?.evidenceStart} evidenceEnd={transcriptDisplay?.evidenceEnd} />
-                                </div>
+                                {transcriptSegment ? (
+                                  <div className="mt-2 rounded border border-stone-200 bg-white p-3 text-sm leading-6 text-stone-800">
+                                    <p className="text-xs font-medium text-stone-500">
+                                      {transcriptSegment.startMs}ms-{transcriptSegment.endMs}ms · {transcriptSegment.label}
+                                      {transcriptSegment.rawLabel && transcriptSegment.rawLabel !== transcriptSegment.label ? ` · raw ${transcriptSegment.rawLabel}` : ""}
+                                    </p>
+                                    <EvidenceText
+                                      content={transcriptSegment.text}
+                                      evidenceStart={segmentEvidenceStart >= 0 ? segmentEvidenceStart : null}
+                                      evidenceEnd={segmentEvidenceStart >= 0 ? segmentEvidenceStart + transcriptSpan.evidence_text.replace(/^[^:]+:\s*/, "").length : null}
+                                    />
+                                  </div>
+                                ) : (
+                                  <div className="mt-2 max-h-52 overflow-auto rounded border border-stone-200 bg-white p-3 text-sm leading-6 text-stone-800">
+                                    <EvidenceText content={transcriptDisplay?.content ?? transcriptSource} evidenceStart={transcriptDisplay?.evidenceStart} evidenceEnd={transcriptDisplay?.evidenceEnd} />
+                                  </div>
+                                )}
                                 {transcriptSpan.transcript_start_ms !== null && transcriptSpan.transcript_end_ms !== null ? (
                                   <p className="mt-2 text-stone-600">Transcript segment: {transcriptSpan.transcript_start_ms}ms-{transcriptSpan.transcript_end_ms}ms</p>
                                 ) : null}

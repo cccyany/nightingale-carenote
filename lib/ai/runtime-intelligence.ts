@@ -6,6 +6,7 @@ type SupabaseRpcClient = {
 };
 
 type RuntimeTranscriptSegment = {
+  id?: string;
   start_ms: number;
   end_ms: number;
   text: string;
@@ -127,7 +128,7 @@ export async function persistRuntimeClinicalIntelligence({
 
   for (const candidate of candidates) {
     const timestamps = transcriptTimestampForEvidence(candidate.charStart, sourceTranscript, segments);
-    const span = await rpc<string>(supabase, provenanceRpcName, {
+    const spanParams = {
       p_entry_id: entryId,
       p_source_content: sourceTranscript,
       p_evidence_text: candidate.sourceEvidenceText,
@@ -138,7 +139,9 @@ export async function persistRuntimeClinicalIntelligence({
       p_transcript_start_ms: timestamps.startMs,
       p_transcript_end_ms: timestamps.endMs,
       ...provenanceRpcExtraParams
-    });
+    };
+    if (timestamps.segmentId) Object.assign(spanParams, { p_transcript_segment_id: timestamps.segmentId });
+    const span = await rpc<string>(supabase, provenanceRpcName, spanParams);
     if (!span.ok) {
       return {
         ok: false,
@@ -174,6 +177,24 @@ export async function persistRuntimeClinicalIntelligence({
         };
       }
       persistedFacts += 1;
+    }
+
+    for (const supporting of candidate.supportingEvidence ?? []) {
+      const supportingTimestamps = transcriptTimestampForEvidence(supporting.charStart, sourceTranscript, segments);
+      const supportingSpanParams = {
+        p_entry_id: entryId,
+        p_source_content: sourceTranscript,
+        p_evidence_text: supporting.sourceEvidenceText,
+        p_char_start: supporting.charStart,
+        p_char_end: supporting.charEnd,
+        p_source_label: sourceLabel,
+        p_session_identifier: sessionIdentifier,
+        p_transcript_start_ms: supportingTimestamps.startMs,
+        p_transcript_end_ms: supportingTimestamps.endMs,
+        ...provenanceRpcExtraParams
+      };
+      if (supportingTimestamps.segmentId) Object.assign(supportingSpanParams, { p_transcript_segment_id: supportingTimestamps.segmentId });
+      await rpc<string>(supabase, provenanceRpcName, supportingSpanParams);
     }
 
     const glance = glanceCandidate(candidate, sourceTranscript);

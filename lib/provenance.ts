@@ -26,8 +26,17 @@ export async function resolveProvenanceSpan(spanId: string): Promise<ProvenanceR
       char_end,
       transcript_start_ms,
       transcript_end_ms,
+      transcript_segment_id,
       entry_id,
       entry_version_id,
+      transcript_segments:transcript_segment_id(
+        text,
+        raw_speaker_label,
+        display_speaker,
+        semantic_speaker_role,
+        start_ms,
+        end_ms
+      ),
       provenance_sources:source_id(
         source_label,
         source_entry_id,

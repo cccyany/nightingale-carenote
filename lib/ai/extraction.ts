@@ -18,6 +18,12 @@ export type StructuredCandidate = {
   evidenceQualityState: EvidenceQualityState;
   reviewState: CandidateReviewState;
   evidenceExplanation: string;
+  supportingEvidence?: Array<{
+    sourceEvidenceText: string;
+    charStart: number;
+    charEnd: number;
+    evidenceExplanation: string;
+  }>;
 };
 
 type ExtractInput = {
@@ -29,6 +35,7 @@ type ExtractInput = {
 };
 
 const medicationPattern = /\b(metformin|lisinopril|atorvastatin)\b/gi;
+const speakerLinePattern = /^(?:doctor|clinician|nurse|patient|staff|unknown|speaker\s*\d+|spk[:_\s-]*\d+):\s*/i;
 
 function candidateBase(input: ExtractInput, match: RegExpExecArray, normalizedValue: string) {
   return {
@@ -56,6 +63,8 @@ export function extractStructuredCandidates(input: ExtractInput): StructuredCand
   ]) {
     const match = pattern.exec(content);
     if (match) {
+      const preceding = content.slice(Math.max(0, match.index - 48), match.index).toLowerCase();
+      if (/\b(mother|father|parent|sister|brother|child|daughter|son)\b/.test(preceding)) continue;
       candidates.push({
         ...candidateBase(input, match, "penicillin"),
         candidateType: "allergy",
@@ -74,6 +83,12 @@ export function extractStructuredCandidates(input: ExtractInput): StructuredCand
       reviewState: "needs_review",
       evidenceExplanation: "Global no-known-allergies statement can contradict prior allergy facts."
     });
+  }
+
+  for (const contextual of contextualAllergyCandidates(input)) {
+    if (!candidates.some((candidate) => candidate.candidateType === "allergy" && candidate.assertion === "present" && candidate.normalizedValue === contextual.normalizedValue)) {
+      candidates.push(contextual);
+    }
   }
 
   for (const match of content.matchAll(medicationPattern)) {
@@ -127,5 +142,42 @@ export function extractStructuredCandidates(input: ExtractInput): StructuredCand
     });
   }
 
+  return candidates;
+}
+
+function contextualAllergyCandidates(input: ExtractInput): StructuredCandidate[] {
+  const candidates: StructuredCandidate[] = [];
+  const lineMatches = [...input.content.matchAll(/[^\r\n]+/g)];
+  for (let index = 0; index < lineMatches.length - 1; index += 1) {
+    const questionMatch = lineMatches[index];
+    const answerMatch = lineMatches[index + 1];
+    const question = questionMatch[0].trim();
+    const answer = answerMatch[0].trim();
+    const questionText = question.replace(speakerLinePattern, "").trim();
+    const answerText = answer.replace(speakerLinePattern, "").trim();
+    if (!/\b(?:medication|drug)?\s*allerg(?:y|ies)\b/i.test(questionText) || !/\b(do you have|any|known)\b/i.test(questionText)) continue;
+    if (/^(?:no|nope|none|no known allergies|no known drug allergies)\b/i.test(answerText)) continue;
+    if (!/^(?:yes|yeah|yep)\b/i.test(answerText)) continue;
+    const penicillin = /\bpenicillin\b/i.exec(answer);
+    if (!penicillin) continue;
+    candidates.push({
+      ...candidateBase(input, {
+        0: answer,
+        index: answerMatch.index ?? 0,
+        input: input.content
+      } as RegExpExecArray, "penicillin"),
+      candidateType: "allergy",
+      assertion: "present",
+      reviewState: "needs_review",
+      evidenceQualityState: "needs_review",
+      evidenceExplanation: "Allergy inferred from an affirmative answer immediately following an allergy question; requires human review.",
+      supportingEvidence: [{
+        sourceEvidenceText: question,
+        charStart: questionMatch.index ?? 0,
+        charEnd: (questionMatch.index ?? 0) + question.length,
+        evidenceExplanation: "Question establishes allergy context for the elliptical answer."
+      }]
+    });
+  }
   return candidates;
 }

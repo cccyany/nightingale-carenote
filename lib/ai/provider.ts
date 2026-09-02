@@ -17,7 +17,7 @@ export interface LlmProvider {
 }
 
 export const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash";
-export const DEFAULT_LLM_TIMEOUT_MS = Number(process.env.LLM_PROVIDER_TIMEOUT_MS ?? 15000);
+export const DEFAULT_LLM_TIMEOUT_MS = Number(process.env.LLM_PROVIDER_TIMEOUT_MS ?? 30000);
 
 export class LlmProviderError extends Error {
   code: "provider_timeout" | "provider_unavailable" | "provider_error";

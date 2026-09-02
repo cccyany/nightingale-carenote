@@ -22,6 +22,7 @@ export type AiScribePersistedContent = {
 export type TranscriptSpeaker = "patient" | "clinician" | "staff" | "unknown";
 
 export type RuntimeTranscriptSegment = {
+  id?: string;
   speaker: TranscriptSpeaker;
   display_speaker: string;
   start_ms: number;
@@ -152,7 +153,7 @@ export function transcriptEvidenceSpan(sourceTranscript: string) {
 export function transcriptTimestampForEvidence(
   evidenceStart: number,
   sourceTranscript: string,
-  segments: Array<{ start_ms: number; end_ms: number; text: string; speaker: string; display_speaker?: string }>
+  segments: Array<{ id?: string; start_ms: number; end_ms: number; text: string; speaker: string; display_speaker?: string }>
 ) {
   let cursor = 0;
   for (const segment of segments) {
@@ -161,11 +162,11 @@ export function transcriptTimestampForEvidence(
     if (start < 0) continue;
     const end = start + rendered.length;
     if (evidenceStart >= start && evidenceStart <= end) {
-      return { startMs: segment.start_ms, endMs: segment.end_ms };
+      return { startMs: segment.start_ms, endMs: segment.end_ms, segmentId: segment.id ?? null };
     }
     cursor = end;
   }
-  return { startMs: 0, endMs: Math.max(1000, Math.min(30000, sourceTranscript.length * 40)) };
+  return { startMs: 0, endMs: Math.max(1000, Math.min(30000, sourceTranscript.length * 40)), segmentId: null };
 }
 
 export function normalizeTranscriptLabels(content: string) {

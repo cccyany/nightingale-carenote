@@ -55,7 +55,7 @@ function normalizeSpeakerLabel(label: unknown): Pick<TranscriptSegment, "speaker
   if (/doctor|clinician|physician/.test(normalized)) return { speaker: "clinician", display_speaker: "Clinician", raw_speaker_label: raw };
   if (/nurse|staff/.test(normalized)) return { speaker: "staff", display_speaker: "Staff", raw_speaker_label: raw };
   if (/patient/.test(normalized)) return { speaker: "patient", display_speaker: "Patient", raw_speaker_label: raw };
-  if (/spk[_\s-]*\d+/.test(normalized)) return { speaker: "unknown", display_speaker: raw.replace(/^spk[_\s-]*/i, "Speaker "), raw_speaker_label: raw };
+  if (/spk[:_\s-]*\d+/.test(normalized)) return { speaker: "unknown", display_speaker: raw.replace(/^spk[:_\s-]*/i, "Speaker "), raw_speaker_label: raw };
   if (/speaker\s*\d+/.test(normalized)) return { speaker: "unknown", display_speaker: raw.replace(/^speaker/i, "Speaker"), raw_speaker_label: raw };
   return { speaker: "unknown", display_speaker: raw === "unknown" ? "unknown" : raw, raw_speaker_label: raw };
 }

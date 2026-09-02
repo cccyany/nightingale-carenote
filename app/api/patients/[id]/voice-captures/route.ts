@@ -223,7 +223,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
   if (entryError) return jsonError(403, "AI scribe entry could not be persisted.", "database_error", entryError);
 
   const evidence = transcriptEvidenceSpan(rawTranscript);
-  const timestamps = transcriptTimestampForEvidence(evidence.charStart, rawTranscript, segments);
+  const timestamps = transcriptTimestampForEvidence(evidence.charStart, rawTranscript, sourceSegments);
   const { data: spanId, error: spanError } = await supabase.rpc("create_voice_provenance_for_transcript_span", {
     p_entry_id: entryId,
     p_session_id: session.id,
@@ -233,7 +233,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     p_char_end: evidence.charEnd,
     p_source_label: parsed.sourceLabel,
     p_transcript_start_ms: timestamps.startMs,
-    p_transcript_end_ms: timestamps.endMs
+    p_transcript_end_ms: timestamps.endMs,
+    p_transcript_segment_id: timestamps.segmentId
   });
   if (spanError) return jsonError(409, "AI summary was generated but source provenance did not validate.", "database_error", spanError);
 
