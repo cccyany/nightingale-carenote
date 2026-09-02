@@ -20,7 +20,8 @@ const demoUsers = [
   { id: "10000000-0000-0000-0000-000000000003", email: "clinician.a@example.test", password: "demo-password" },
   { id: "10000000-0000-0000-0000-000000000004", email: "admin.a@example.test", password: "demo-password" },
   { id: "10000000-0000-0000-0000-000000000005", email: "staff.b@example.test", password: "demo-password" },
-  { id: "10000000-0000-0000-0000-000000000006", email: "clinic.admin.a@example.test", password: "demo-password" }
+  { id: "10000000-0000-0000-0000-000000000006", email: "clinic.admin.a@example.test", password: "demo-password" },
+  { id: "10000000-0000-0000-0000-000000000007", email: "patient.alex@example.test", password: "demo-password" }
 ];
 
 for (const user of demoUsers) {

@@ -8,7 +8,7 @@ function roleDescription(user: DemoAccessIdentity, clinicName?: string) {
   if (user.role === "clinician") return "Review AI evidence, resolve conflicts and update care plans.";
   if (user.role === "staff" && clinicName === "Clinic B") return "Isolation test for another clinic's scoped workspace.";
   if (user.role === "staff") return "Add follow-ups, comments and care-team tasks.";
-  if (user.role === "patient") return "View only clinician-approved patient-safe content.";
+  if (user.role === "patient") return "View approved patient-facing information.";
   return "Clinic-scoped demo identity.";
 }
 
@@ -18,7 +18,7 @@ function actionLabel(user: DemoAccessIdentity, clinicName?: string) {
   if (user.role === "clinician") return "Enter as clinician";
   if (user.role === "staff" && clinicName === "Clinic B") return "Enter Clinic B workspace";
   if (user.role === "staff") return "Enter as staff";
-  if (user.role === "patient") return "Open patient view";
+  if (user.role === "patient") return "Enter as patient";
   return "Open";
 }
 
@@ -88,7 +88,7 @@ export default async function LoginPage() {
                     <div className="rounded-md border border-stone-200 bg-stone-50 p-4" key={patient.id}>
                       <h3 className="font-semibold">{patient.display_name}</h3>
                       <p className="mt-1 text-sm text-stone-600">Patient record · {clinic.name}</p>
-                      <p className="mt-2 text-sm text-stone-700">No patient demo login is provisioned for this record.</p>
+                      <p className="mt-2 text-sm text-stone-700">Care-team record only.</p>
                     </div>
                   ))}
               </div>

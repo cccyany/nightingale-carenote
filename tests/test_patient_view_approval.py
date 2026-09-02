@@ -25,6 +25,11 @@ def patient_session():
 
 
 @pytest.fixture(scope="module")
+def alex_patient_session():
+    return sign_in("patient.alex@example.test")
+
+
+@pytest.fixture(scope="module")
 def clinic_b_staff_session():
     return sign_in("staff.b@example.test")
 
@@ -177,6 +182,27 @@ def test_patient_cannot_read_internal_notes_comments_or_other_patient(patient_se
         status, rows = patient_session.get(table, params)
         assert status == 200
         assert rows == []
+
+
+def test_alex_patient_identity_is_scoped_to_existing_clinic_b_patient(alex_patient_session, clinic_b_staff_session) -> None:
+    status, own_patient = alex_patient_session.get("patients", {"select": "id,display_name", "id": f"eq.{CLINIC_B_PATIENT_ID}"})
+    assert status == 200
+    assert own_patient == [{"id": CLINIC_B_PATIENT_ID, "display_name": "Alex Lim"}]
+
+    status, jane = alex_patient_session.get("patients", {"select": "id", "id": f"eq.{JANE_PATIENT_ID}"})
+    assert status == 200
+    assert jane == []
+
+    status, internal_entries = alex_patient_session.get(
+        "care_entries",
+        {"select": "id", "patient_id": f"eq.{CLINIC_B_PATIENT_ID}", "visibility": "eq.staff_internal"},
+    )
+    assert status == 200
+    assert internal_entries == []
+
+    status, bo_visible = clinic_b_staff_session.get("patients", {"select": "id", "id": f"eq.{CLINIC_B_PATIENT_ID}"})
+    assert status == 200
+    assert bo_visible == [{"id": CLINIC_B_PATIENT_ID}]
 
 
 def test_editing_approved_patient_content_requires_reapproval_and_is_audited(clinician_session, patient_session, service) -> None:

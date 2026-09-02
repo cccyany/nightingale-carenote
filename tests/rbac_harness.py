@@ -69,6 +69,7 @@ class CareNoteBoundary:
     def __init__(self) -> None:
         self.users = {
             "demo-patient": User("user-patient-jane", "demo-patient", "patient", "clinic-a", "patient-jane-tan"),
+            "demo-patient-alex": User("user-patient-alex", "demo-patient-alex", "patient", "clinic-b", "patient-clinic-b"),
             "demo-staff": User("user-staff-a", "demo-staff", "staff", "clinic-a"),
             "demo-clinician": User("user-clinician-a", "demo-clinician", "clinician", "clinic-a"),
             "demo-admin": User("user-admin-a", "demo-admin", "admin", "clinic-a"),
@@ -128,6 +129,16 @@ class CareNoteBoundary:
                 "staff_note",
                 "staff_internal",
                 "Synthetic Clinic B internal note.",
+            ),
+            "entry-clinic-b-approved": CareEntry(
+                "entry-clinic-b-approved",
+                "clinic-b",
+                "patient-clinic-b",
+                "staff",
+                "user-staff-b",
+                "instruction",
+                "patient_approved",
+                "Please follow Clinic B approved instructions.",
             ),
         }
         self.comments = {

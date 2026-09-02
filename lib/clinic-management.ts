@@ -36,6 +36,12 @@ export type AvailableProfile = {
   primary_role: string;
 };
 
+export type ManagedClinicOption = {
+  id: string;
+  name: string;
+  status: string;
+};
+
 export type ClinicManagement = {
   status: "ok";
   clinic: {

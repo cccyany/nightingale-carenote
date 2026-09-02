@@ -61,6 +61,16 @@ export const demoUsers: DemoUser[] = [
     role: "staff",
     clinicId: "clinic-b",
     clinicName: "Clinic B"
+  },
+  {
+    id: "user-patient-alex",
+    profileId: "10000000-0000-0000-0000-000000000007",
+    token: "demo-patient-alex",
+    name: "Alex Lim",
+    role: "patient",
+    clinicId: "clinic-b",
+    clinicName: "Clinic B",
+    patientId: "patient-clinic-b"
   }
 ];
 

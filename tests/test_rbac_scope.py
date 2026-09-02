@@ -67,3 +67,22 @@ def test_clinic_a_users_cannot_access_clinic_b_patient(api_boundary: CareNoteBou
 def test_clinic_b_user_cannot_access_clinic_a_patient(api_boundary: CareNoteBoundary) -> None:
     with pytest.raises(Forbidden):
         api_boundary.list_patient_entries("demo-clinic-b-staff", "patient-jane-tan")
+
+
+def test_alex_patient_can_read_only_alex_patient_safe_content(api_boundary: CareNoteBoundary) -> None:
+    entries = api_boundary.list_patient_entries("demo-patient-alex", "patient-clinic-b")
+
+    assert [entry.id for entry in entries] == ["entry-clinic-b-approved"]
+
+
+def test_alex_and_jane_patient_identities_are_isolated(api_boundary: CareNoteBoundary) -> None:
+    with pytest.raises(Forbidden):
+        api_boundary.list_patient_entries("demo-patient-alex", "patient-jane-tan")
+
+    with pytest.raises(Forbidden):
+        api_boundary.list_patient_entries("demo-patient", "patient-clinic-b")
+
+
+def test_alex_patient_cannot_read_clinic_b_internal_care_team_note(api_boundary: CareNoteBoundary) -> None:
+    with pytest.raises(Forbidden):
+        api_boundary.get_entry("demo-patient-alex", "entry-clinic-b")

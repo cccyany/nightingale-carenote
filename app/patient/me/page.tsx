@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AppShell } from "@/components/AppShell";
+import { AppShell, actorForDemo } from "@/components/AppShell";
 import { createSupabaseActorClient } from "@/lib/supabase/request";
 
 export const dynamic = "force-dynamic";
@@ -46,7 +46,8 @@ export default async function PatientMePage({
   searchParams?: Promise<{ demo?: string }>;
 }) {
   const demo = (await searchParams)?.demo;
-  if (!demo || demo !== "demo-patient") {
+  const actor = actorForDemo(demo);
+  if (!demo || actor?.role !== "patient") {
     return (
       <AppShell patientView>
         <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">

@@ -8,6 +8,7 @@ const clinicDirectory = readFileSync("app/admin/clinics/page.tsx", "utf8");
 const clinicDetail = readFileSync("app/admin/clinics/[clinicId]/page.tsx", "utf8");
 const clinicActions = readFileSync("components/ClinicManagementActions.tsx", "utf8");
 const demoPersonActions = readFileSync("components/DemoPersonActions.tsx", "utf8");
+const patientMePage = readFileSync("app/patient/me/page.tsx", "utf8");
 const demoAccess = readFileSync("lib/demo-access.ts", "utf8");
 const demoData = readFileSync("lib/demo-data.ts", "utf8");
 const demoAccessMigration = readFileSync("supabase/migrations/025_demo_identity_access.sql", "utf8");
@@ -59,17 +60,39 @@ test("new demo identities are listed by clinic from the registry", () => {
   assert.match(loginPage, /const access = await listDemoAccess\(\)/);
   assert.match(loginPage, /access\.clinics\.map\(\(clinic\)/);
   assert.match(loginPage, /clinicUsers\.filter\(\(user\) => user\.clinic_id === clinic\.id\)/);
+  assert.doesNotMatch(loginPage, /No patient demo login is provisioned for this record/);
   assert.match(demoAccessMigration, /from demo_identities/);
   assert.match(supabaseRequest, /resolve_demo_identity/);
 });
 
+test("Alex Lim is a Clinic B patient demo identity, not a staff-routed patient record", () => {
+  assert.match(demoData, /token: "demo-patient-alex"[\s\S]*name: "Alex Lim"[\s\S]*role: "patient"[\s\S]*clinicId: "clinic-b"/);
+  assert.match(loginPage, /View approved patient-facing information/);
+  assert.match(loginPage, /Enter as patient/);
+  assert.match(loginPage, /if \(user\.role === "patient"\) return `\/patient\/me\?demo=\$\{user\.token\}`/);
+  assert.doesNotMatch(loginPage, /\/patients\/\$\{patient\.id\}\?demo=\$\{careTeamActor\.token\}/);
+  assert.match(patientMePage, /actor\?\.role !== "patient"/);
+  assert.doesNotMatch(patientMePage, /demo !== "demo-patient"/);
+});
+
 test("clinic-level member and patient actions live inside clinic management", () => {
   assert.match(clinicActions, /Add existing demo\/profile/);
+  assert.match(clinicActions, /Edit role/);
+  assert.match(clinicActions, /Remove/);
+  assert.match(clinicActions, /Transfer clinic/);
+  assert.match(clinicActions, /Clinic Administrator/);
+  assert.doesNotMatch(clinicActions, /Platform Administrator<\/option>/);
   assert.match(clinicActions, /Create patient/);
   assert.match(clinicActions, /\/api\/admin\/clinics\/\$\{clinicId\}\/members/);
+  assert.match(clinicActions, /\/api\/admin\/clinic-memberships\/\$\{membershipId\}/);
+  assert.match(clinicActions, /\/api\/admin\/clinic-memberships\/\$\{membershipId\}\/transfer/);
   assert.match(clinicActions, /\/api\/admin\/clinics\/\$\{clinicId\}\/patients/);
   assert.match(clinicDetail, /AddClinicMemberForm/);
+  assert.match(clinicDetail, /ClinicMemberLifecycleActions/);
+  assert.match(clinicDetail, /canTransfer=\{management\.can_create_clinics\}/);
   assert.match(clinicDetail, /CreateClinicPatientForm/);
+  assert.match(clinicDetail, /rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white/);
+  assert.doesNotMatch(clinicDetail, /Open CareNote -&gt;/);
 });
 
 test("ordinary clinician, staff and patient navigation does not expose clinic administration controls", () => {

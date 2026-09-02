@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { AppShell, actorForDemo } from "@/components/AppShell";
-import { AddClinicMemberForm, CreateClinicPatientForm } from "@/components/ClinicManagementActions";
-import { getClinicManagement } from "@/lib/clinic-management";
+import { AddClinicMemberForm, ClinicMemberLifecycleActions, CreateClinicPatientForm } from "@/components/ClinicManagementActions";
+import { getClinicManagement, listManagedClinics } from "@/lib/clinic-management";
 
 function displayToken(value: string) {
   return value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
@@ -37,6 +37,7 @@ export default async function ClinicManagementPage({
   const administrators = management.memberships.filter((membership) => membership.role === "admin");
   const clinicians = management.memberships.filter((membership) => membership.role === "clinician");
   const staff = management.memberships.filter((membership) => membership.role === "staff");
+  const managedClinics = management.can_create_clinics ? await listManagedClinics(demo) : [];
 
   return (
     <AppShell demo={demo} clinicName={management.clinic.name}>
@@ -54,7 +55,7 @@ export default async function ClinicManagementPage({
             <div>
               <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Clinic management</p>
               <h1 className="mt-2 text-3xl font-semibold tracking-tight">{management.clinic.name}</h1>
-              <p className="mt-1 text-sm text-stone-600">{management.clinic.code ?? "No code"} · {management.clinic.timezone}</p>
+              <p className="mt-1 text-sm text-stone-600">{management.clinic.code ?? "No code"} - {management.clinic.timezone}</p>
             </div>
             <span className="rounded-full bg-teal-50 px-3 py-1 text-sm font-medium text-teal-900">{displayToken(management.clinic.status)}</span>
           </div>
@@ -62,9 +63,9 @@ export default async function ClinicManagementPage({
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
           <section className="space-y-4">
-            <RoleSection title="Administrators" count={administrators.length} rows={administrators} />
-            <RoleSection title="Clinicians" count={clinicians.length} rows={clinicians} />
-            <RoleSection title="Staff" count={staff.length} rows={staff} />
+            <RoleSection canTransfer={management.can_create_clinics} clinicId={management.clinic.id} clinicName={management.clinic.name} demo={demo} managedClinics={managedClinics} title="Administrators" count={administrators.length} rows={administrators} />
+            <RoleSection canTransfer={management.can_create_clinics} clinicId={management.clinic.id} clinicName={management.clinic.name} demo={demo} managedClinics={managedClinics} title="Clinicians" count={clinicians.length} rows={clinicians} />
+            <RoleSection canTransfer={management.can_create_clinics} clinicId={management.clinic.id} clinicName={management.clinic.name} demo={demo} managedClinics={managedClinics} title="Staff" count={staff.length} rows={staff} />
             <section className="rounded-md border border-stone-200 bg-white p-4 shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-lg font-semibold">Patients</h2>
@@ -77,7 +78,7 @@ export default async function ClinicManagementPage({
                       <span className="block font-medium">{patient.display_name}</span>
                       <span className="text-sm text-stone-600">DOB {dateLabel(patient.date_of_birth)}</span>
                     </span>
-                    <span className="text-sm font-medium">Open CareNote -&gt;</span>
+                    <span className="rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800 focus:outline-none focus:ring-2 focus:ring-teal-600">Open CareNote</span>
                   </Link>
                 )) : <p className="py-3 text-sm text-stone-600">No patients in this clinic yet.</p>}
               </div>
@@ -101,11 +102,21 @@ export default async function ClinicManagementPage({
 function RoleSection({
   title,
   count,
-  rows
+  rows,
+  demo,
+  clinicId,
+  clinicName,
+  canTransfer,
+  managedClinics
 }: {
   title: string;
   count: number;
-  rows: Array<{ id: string; display_name: string; primary_role: string; created_at: string }>;
+  rows: Array<{ id: string; display_name: string; primary_role: string; role: "admin" | "clinician" | "staff"; created_at: string }>;
+  demo: string;
+  clinicId: string;
+  clinicName: string;
+  canTransfer: boolean;
+  managedClinics: Array<{ id: string; name: string; status: string }>;
 }) {
   return (
     <section className="rounded-md border border-stone-200 bg-white p-4 shadow-sm">
@@ -117,7 +128,17 @@ function RoleSection({
         {rows.length ? rows.map((row) => (
           <div className="py-3" key={row.id}>
             <p className="font-medium">{row.display_name}</p>
-            <p className="text-sm text-stone-600">Primary role: {displayToken(row.primary_role)} · Added {dateLabel(row.created_at)}</p>
+            <p className="text-sm text-stone-600">{displayToken(row.role)} - Added {dateLabel(row.created_at)}</p>
+            <ClinicMemberLifecycleActions
+              canTransfer={canTransfer}
+              clinicName={clinicName}
+              clinics={managedClinics}
+              currentRole={row.role}
+              demo={demo}
+              memberName={row.display_name}
+              membershipId={row.id}
+              sourceClinicId={clinicId}
+            />
           </div>
         )) : <p className="py-3 text-sm text-stone-600">None yet.</p>}
       </div>

@@ -177,7 +177,8 @@ insert into profiles (id, display_name, primary_role) values
   ('10000000-0000-0000-0000-000000000003', 'Dr Mina Koh', 'clinician'),
   ('10000000-0000-0000-0000-000000000004', 'Avery Ong', 'admin'),
   ('10000000-0000-0000-0000-000000000005', 'Bo Chen', 'staff'),
-  ('10000000-0000-0000-0000-000000000006', 'Clara Ng', 'admin')
+  ('10000000-0000-0000-0000-000000000006', 'Clara Ng', 'admin'),
+  ('10000000-0000-0000-0000-000000000007', 'Alex Lim', 'patient')
 on conflict (id) do nothing;
 
 insert into clinic_memberships (clinic_id, profile_id, role) values
@@ -186,7 +187,8 @@ insert into clinic_memberships (clinic_id, profile_id, role) values
   ('20000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000003', 'clinician'),
   ('20000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000004', 'admin'),
   ('20000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000006', 'admin'),
-  ('20000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000005', 'staff')
+  ('20000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000005', 'staff'),
+  ('20000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000007', 'patient')
 on conflict do nothing;
 
 insert into platform_admins (profile_id) values
@@ -199,15 +201,17 @@ insert into demo_identities (token, profile_id, clinic_id, role, email) values
   ('demo-clinician', '10000000-0000-0000-0000-000000000003', '20000000-0000-0000-0000-000000000001', 'clinician', 'clinician.a@example.test'),
   ('demo-admin', '10000000-0000-0000-0000-000000000004', '20000000-0000-0000-0000-000000000001', 'admin', 'admin.a@example.test'),
   ('demo-clinic-b-staff', '10000000-0000-0000-0000-000000000005', '20000000-0000-0000-0000-000000000002', 'staff', 'staff.b@example.test'),
-  ('demo-clinic-admin-a', '10000000-0000-0000-0000-000000000006', '20000000-0000-0000-0000-000000000001', 'admin', 'clinic.admin.a@example.test')
+  ('demo-clinic-admin-a', '10000000-0000-0000-0000-000000000006', '20000000-0000-0000-0000-000000000001', 'admin', 'clinic.admin.a@example.test'),
+  ('demo-patient-alex', '10000000-0000-0000-0000-000000000007', '20000000-0000-0000-0000-000000000002', 'patient', 'patient.alex@example.test')
 on conflict (profile_id, clinic_id, role) do update
   set token = excluded.token,
       email = excluded.email;
 
 insert into patients (id, clinic_id, profile_id, display_name, date_of_birth, synthetic) values
   ('30000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'Jane Tan', '1968-08-26', true),
-  ('30000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-000000000002', null, 'Alex Lim', '1982-02-14', true)
-on conflict (id) do nothing;
+  ('30000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000007', 'Alex Lim', '1982-02-14', true)
+on conflict (id) do update
+  set profile_id = excluded.profile_id;
 
 insert into care_entries (id, clinic_id, patient_id, author_role, author_id, entry_type, visibility, content, occurred_at) values
   ('40000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001', 'clinician', '10000000-0000-0000-0000-000000000003', 'clinician_note', 'clinician_internal', 'Penicillin allergy documented.', '2025-04-15T09:00:00Z'),
