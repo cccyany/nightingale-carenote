@@ -6,7 +6,7 @@ function roleDescription(role: string, clinicName: string) {
   if (role === "staff" && clinicName === "Clinic B") return "Isolation test for another clinic's scoped workspace.";
   if (role === "staff") return "Add follow-ups, comments and care-team tasks.";
   if (role === "patient") return "View only clinician-approved patient-safe content.";
-  return "Clinic-scoped oversight without cross-clinic access.";
+  return "Provision clinics, manage memberships and create clinic-scoped patients.";
 }
 
 function actionLabel(role: string, clinicName: string) {
@@ -14,7 +14,7 @@ function actionLabel(role: string, clinicName: string) {
   if (role === "staff" && clinicName === "Clinic B") return "Enter Clinic B workspace";
   if (role === "staff") return "Enter as staff";
   if (role === "patient") return "Open patient view";
-  return "Enter as admin";
+  return "Open clinic management";
 }
 
 function roleLabel(role: string) {
@@ -45,7 +45,7 @@ export default function LoginPage() {
             </div>
             <p className="mt-3 min-h-12 text-sm leading-6 text-stone-700">{roleDescription(user.role, user.clinicName)}</p>
             <div className="mt-4">
-              <Link className="inline-flex rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800 focus:outline-none focus:ring-2 focus:ring-teal-600" href={user.role === "patient" ? `/patient/me?demo=${user.token}` : `/patients?demo=${user.token}`}>
+              <Link className="inline-flex rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800 focus:outline-none focus:ring-2 focus:ring-teal-600" href={user.role === "patient" ? `/patient/me?demo=${user.token}` : user.role === "admin" ? `/admin/clinics?demo=${user.token}` : `/patients?demo=${user.token}`}>
                 {actionLabel(user.role, user.clinicName)}
               </Link>
             </div>

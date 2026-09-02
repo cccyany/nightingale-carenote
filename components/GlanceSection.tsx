@@ -78,14 +78,14 @@ export function GlanceSection({
         <div className="flex flex-wrap items-center gap-2">
           <div className="inline-flex rounded-md border border-stone-200 bg-stone-50 p-1 text-sm">
             <button
-              className={`rounded px-3 py-1.5 font-medium focus:outline-none focus:ring-2 focus:ring-teal-600 ${view === "active" ? "bg-white text-teal-900 shadow-sm" : "text-stone-600 hover:text-stone-900"}`}
+              className={`rounded px-3 py-1.5 font-medium focus:outline-none focus:ring-2 focus:ring-teal-600 ${view === "active" ? "bg-teal-700 text-white shadow-sm" : "text-stone-600 hover:text-stone-900"}`}
               onClick={() => selectView("active")}
               type="button"
             >
               Active {splitItems.active.length}
             </button>
             <button
-              className={`rounded px-3 py-1.5 font-medium focus:outline-none focus:ring-2 focus:ring-teal-600 ${view === "confirmed" ? "bg-white text-teal-900 shadow-sm" : "text-stone-600 hover:text-stone-900"}`}
+              className={`rounded px-3 py-1.5 font-medium focus:outline-none focus:ring-2 focus:ring-teal-600 ${view === "confirmed" ? "bg-teal-700 text-white shadow-sm" : "text-stone-600 hover:text-stone-900"}`}
               onClick={() => selectView("confirmed")}
               type="button"
             >

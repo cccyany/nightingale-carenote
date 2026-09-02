@@ -187,6 +187,10 @@ insert into clinic_memberships (clinic_id, profile_id, role) values
   ('20000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000005', 'staff')
 on conflict do nothing;
 
+insert into platform_admins (profile_id) values
+  ('10000000-0000-0000-0000-000000000004')
+on conflict do nothing;
+
 insert into patients (id, clinic_id, profile_id, display_name, date_of_birth, synthetic) values
   ('30000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'Jane Tan', '1968-08-26', true),
   ('30000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-000000000002', null, 'Alex Lim', '1982-02-14', true)
