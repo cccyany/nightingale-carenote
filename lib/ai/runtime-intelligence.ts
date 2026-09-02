@@ -11,6 +11,7 @@ type RuntimeTranscriptSegment = {
   text: string;
   speaker: string;
   display_speaker?: string;
+  raw_speaker_label?: string;
 };
 
 type PersistRuntimeClinicalIntelligenceInput = {
@@ -21,6 +22,9 @@ type PersistRuntimeClinicalIntelligenceInput = {
   sourceLabel: string;
   sessionIdentifier: string | null;
   segments: RuntimeTranscriptSegment[];
+  provenanceRpcName?: string;
+  glanceRpcName?: string;
+  provenanceRpcExtraParams?: Record<string, unknown>;
 };
 
 type PersistedRuntimeClinicalIntelligence = {
@@ -106,7 +110,10 @@ export async function persistRuntimeClinicalIntelligence({
   sourceTranscript,
   sourceLabel,
   sessionIdentifier,
-  segments
+  segments,
+  provenanceRpcName = "create_provenance_for_transcript_span",
+  glanceRpcName = "create_runtime_glance_candidate",
+  provenanceRpcExtraParams = {}
 }: PersistRuntimeClinicalIntelligenceInput): Promise<PersistedRuntimeClinicalIntelligence | FailedRuntimeClinicalIntelligence> {
   const candidates = extractStructuredCandidates({
     entryId,
@@ -120,7 +127,7 @@ export async function persistRuntimeClinicalIntelligence({
 
   for (const candidate of candidates) {
     const timestamps = transcriptTimestampForEvidence(candidate.charStart, sourceTranscript, segments);
-    const span = await rpc<string>(supabase, "create_provenance_for_transcript_span", {
+    const span = await rpc<string>(supabase, provenanceRpcName, {
       p_entry_id: entryId,
       p_source_content: sourceTranscript,
       p_evidence_text: candidate.sourceEvidenceText,
@@ -129,7 +136,8 @@ export async function persistRuntimeClinicalIntelligence({
       p_source_label: sourceLabel,
       p_session_identifier: sessionIdentifier,
       p_transcript_start_ms: timestamps.startMs,
-      p_transcript_end_ms: timestamps.endMs
+      p_transcript_end_ms: timestamps.endMs,
+      ...provenanceRpcExtraParams
     });
     if (!span.ok) {
       return {
@@ -170,7 +178,7 @@ export async function persistRuntimeClinicalIntelligence({
 
     const glance = glanceCandidate(candidate, sourceTranscript);
     if (glance) {
-      const item = await rpc(supabase, "create_runtime_glance_candidate", {
+      const item = await rpc(supabase, glanceRpcName, {
         p_patient_id: patientId,
         p_provenance_span_id: span.data,
         p_title: glance.title,

@@ -73,8 +73,9 @@ Required environment variables:
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `SUPABASE_DB_URL` using the Supabase Session Pooler connection string
-- `GEMINI_API_KEY` to enable real Gemini generation on server-side AI-scribe flows
+- `GEMINI_API_KEY` to enable real Gemini generation on server-side AI-scribe and Ambient Consult transcription flows
 - `GEMINI_MODEL`, default `gemini-3.5-flash`
+- `GEMINI_TRANSCRIBE_MODEL`, default `gemini-3.5-transcribe`
 
 Optional environment variables:
 
@@ -153,15 +154,28 @@ Every LLM call goes through the centralized safe AI gateway:
 
 The current redactor detects synthetic names, Singapore NRIC/FIN-like identifiers, phone numbers, email addresses, and obvious structured identifiers. Metadata reports classes/counts without exposing original values. If verification cannot establish a safe payload, the request is blocked and marked for review.
 
-The provider abstraction supports a real Google Gemini adapter and deterministic/mock providers. If `GEMINI_API_KEY` is configured, server-side AI-scribe and synthetic voice-capture flows use Gemini with `GEMINI_MODEL` defaulting to the documented `gemini-3.5-flash` model. If no Gemini key is configured, the deterministic mock provider remains the default/fallback for tests, offline development, and demos without paid credentials.
+The provider abstraction supports a real Google Gemini adapter and deterministic/mock providers. If `GEMINI_API_KEY` is configured, server-side AI-scribe flows use Gemini with `GEMINI_MODEL` defaulting to `gemini-3.5-flash`. Ambient Consult transcription uses the dedicated `GEMINI_TRANSCRIBE_MODEL`, defaulting to `gemini-3.5-transcribe`. If no Gemini key is configured, deterministic mock providers remain available only for tests and explicit offline fixture paths.
 
 The Gemini provider receives redacted text only through `invokeSafeLlm()`. It asks for concise structured JSON for downstream validation, but deterministic extraction, provenance validation, clinical conflict detection, risk floors, importance ranking, and patient-facing approval remain separate from LLM generation. Malformed, empty, timed-out, unavailable, or provider-error responses fail into `needs_review` rather than becoming trusted clinical content.
 
 `npm.cmd run verify:gemini` performs a synthetic smoke test when `GEMINI_API_KEY` is present. It uses synthetic PHI, reports only redaction metadata and provider identity, and does not print the original synthetic values or API key.
 
-## Ambient Voice
+## Ambient Consult Audio
 
-Synthetic ambient capture demonstrates architecture only: synthetic audio/transcript upload, deterministic transcription abstraction, speaker-labelled segments, timestamps, uncertainty markers, redaction before AI processing, AI-scribed entry creation, and timestamp provenance. It does not claim production diarization, noisy-room, multilingual, or code-switching accuracy.
+Phase A Ambient Consult is post-consult processing, not realtime monitoring:
+
+`record/upload audio -> ASR transcription -> speaker-labelled timestamped transcript -> transcript redaction -> downstream AI Scribe -> deterministic extraction/conflicts/Glance -> human review`
+
+The clinical workspace supports browser `MediaRecorder` capture and audio upload for synthetic WAV, MP3, M4A, and WebM files. Audio is sent to the configured ASR provider before text redaction because transcript text does not exist yet. The resulting transcript is then sent through `invokeSafeLlm()` so textual PHI redaction occurs before downstream generative summarization. Voice-derived AI Scribe entries remain unverified/internal, clinical facts remain needs-review, and provenance resolves back to transcript evidence with timestamps.
+
+Production raw-audio processing would require an appropriate ASR privacy/retention boundary, DPA, or on-device/self-hosted transcription. This repository does not claim validated noisy-room, Hokkien/Malay/English code-switching, diarization, or streaming allergy detection.
+
+Targeted audio checks:
+
+```powershell
+node --test tests/voice_transcription.test.mjs tests/security_static.test.mjs
+python -m pytest tests/test_voice_capture.py -rs
+```
 
 ## Performance
 
@@ -210,5 +224,5 @@ These are prototype evaluation evidence on small synthetic fixtures, not clinica
 - Collaboration uses section/entry optimistic concurrency rather than CRDTs.
 - Revision history stores full snapshots rather than complex semantic diff objects.
 - AI and transcription providers are abstracted; Gemini can be enabled with a server-only key, and deterministic mock providers keep tests/offline demos working without paid credentials.
-- Ambient voice capture is synthetic and not validated for real clinical audio.
+- Ambient Consult is post-consult audio processing; realtime streaming consult alerts are not implemented.
 - Phone-only patient identity, WhatsApp/SMS/email delivery, and realtime streaming consult alerts are not implemented in this repository.

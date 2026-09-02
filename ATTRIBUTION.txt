@@ -110,10 +110,14 @@ Models, transcription, assets, and fonts
   Purpose: local/test fallback for safe gateway and demo flows when GEMINI_API_KEY is absent.
   License/terms: repository code; no external service required.
 
-- Transcription provider abstraction
-  Purpose: synthetic ambient voice capture path.
-  Provider actually required for tests/demo: deterministic/mock transcription provider implemented in repository code.
-  License/terms: no external transcription service is required for the committed demo path. Any configured real provider terms require manual verification before use.
+- Gemini transcription provider
+  Purpose: Phase A post-consult Ambient Consult audio transcription.
+  Model ID used by default: gemini-3.5-transcribe.
+  Terms/license: Google hosted service/API terms require manual verification against the current Google AI for Developers terms before external distribution or production use.
+
+- Deterministic transcription provider
+  Purpose: local/test transcription provider for synthetic fixture text.
+  License/terms: repository code; no external transcription service required for automated tests.
 
 - Visual assets/icons/fonts
   Purpose: none beyond framework/system CSS and text-based UI in the committed app.

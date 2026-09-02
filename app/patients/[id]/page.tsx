@@ -3,6 +3,7 @@ import { AppShell, actorForDemo } from "@/components/AppShell";
 import { GlanceSection } from "@/components/GlanceSection";
 import {
   AiScribeComposer,
+  AmbientConsultComposer,
   CommentComposer,
   CommentResolveButton,
   EntryEditor,
@@ -530,6 +531,7 @@ export default async function PatientPage({
             </details>
 
             <NoteComposer patientId={id} />
+            <AmbientConsultComposer patientId={id} actorRole={actor?.role} />
             <AiScribeComposer patientId={id} actorRole={actor?.role} />
             <TaskComposer patientId={id} users={assignableUsers} />
             <details className="rounded-md border border-stone-200 bg-white shadow-sm">

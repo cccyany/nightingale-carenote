@@ -51,19 +51,28 @@ test("runtime application code invokes external LLM providers only through the s
   assert.deepEqual(offenders, []);
 });
 
-test("AI scribe routes invoke the safe gateway before persistence RPCs", () => {
-  for (const file of [
-    path.join("app", "api", "patients", "[id]", "ai-scribe", "route.ts"),
-    path.join("app", "api", "patients", "[id]", "voice-captures", "route.ts")
-  ]) {
-    const text = fs.readFileSync(file, "utf8");
-    const gatewayIndex = text.indexOf("await invokeSafeLlm");
-    const transcriptIndex = text.indexOf("create_transcript_session");
-    const ingestIndex = text.indexOf("ingest_ai_scribed_note");
-    assert.ok(gatewayIndex >= 0, `${file} must use invokeSafeLlm`);
-    assert.ok(transcriptIndex > gatewayIndex, `${file} must create transcript source after safe gateway`);
-    assert.ok(ingestIndex > gatewayIndex, `${file} must persist AI entry after safe gateway`);
-  }
+test("AI scribe text route invokes the safe gateway before persistence RPCs", () => {
+  const file = path.join("app", "api", "patients", "[id]", "ai-scribe", "route.ts");
+  const text = fs.readFileSync(file, "utf8");
+  const gatewayIndex = text.indexOf("await invokeSafeLlm");
+  const transcriptIndex = text.indexOf("create_transcript_session");
+  const ingestIndex = text.indexOf("ingest_ai_scribed_note");
+  assert.ok(gatewayIndex >= 0, `${file} must use invokeSafeLlm`);
+  assert.ok(transcriptIndex > gatewayIndex, `${file} must create transcript source after safe gateway`);
+  assert.ok(ingestIndex > gatewayIndex, `${file} must persist AI entry after safe gateway`);
+});
+
+test("voice route persists ASR transcript before downstream redacted AI summary only", () => {
+  const file = path.join("app", "api", "patients", "[id]", "voice-captures", "route.ts");
+  const text = fs.readFileSync(file, "utf8");
+  const transcribeIndex = text.indexOf("parsed.provider.transcribe");
+  const transcriptIndex = text.indexOf("complete_voice_transcription");
+  const gatewayIndex = text.indexOf("await invokeSafeLlm");
+  const ingestIndex = text.indexOf("ingest_voice_ai_scribed_note");
+  assert.ok(transcribeIndex >= 0, "voice route must call a transcription provider");
+  assert.ok(transcriptIndex > transcribeIndex, "voice route must persist ASR transcript after transcription");
+  assert.ok(gatewayIndex > transcriptIndex, "voice route must redact transcript through safe gateway before generative summary");
+  assert.ok(ingestIndex > gatewayIndex, "voice route must persist AI Scribe entry after safe gateway succeeds");
 });
 
 test("patient-facing generation route invokes the safe gateway before draft persistence", () => {
