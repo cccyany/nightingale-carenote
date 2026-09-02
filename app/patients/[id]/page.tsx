@@ -30,6 +30,9 @@ const filters = [
   ["patient", "Patient"]
 ];
 
+const sidebarSummaryClass = "cursor-pointer px-4 py-3 text-base font-semibold text-stone-900 hover:bg-stone-50";
+const entryActionSummaryClass = "cursor-pointer text-sm font-semibold text-stone-800";
+
 function dateLabel(value: string) {
   return new Intl.DateTimeFormat("en-SG", { dateStyle: "medium", timeZone: "Asia/Singapore" }).format(new Date(value));
 }
@@ -378,9 +381,9 @@ export default async function PatientPage({
                               </details>
                             ) : null}
                             {transcriptSpan ? (
-                              <details className={`mt-3 rounded border p-3 text-xs ${sourceEntryId === entry.id ? "border-amber-300 bg-amber-50" : "border-amber-200 bg-white/70"}`} open={sourceEntryId === entry.id}>
-                                <summary className="cursor-pointer font-semibold text-stone-800">Review source</summary>
-                                <p className="mt-2 text-stone-600">Source transcript. Highlighted text is exact source evidence; the generated summary remains needs verification.</p>
+                              <details className={`mt-3 rounded-md border p-3 ${sourceEntryId === entry.id ? "border-amber-300 bg-amber-50" : "border-amber-200 bg-white/70"}`} open={sourceEntryId === entry.id}>
+                                <summary className={entryActionSummaryClass}>Review source</summary>
+                                <p className="mt-2 text-xs text-stone-600">Source transcript. Highlighted text is exact source evidence; the generated summary remains needs verification.</p>
                                 {transcriptSegment ? (
                                   <div className="mt-2 rounded border border-stone-200 bg-white p-3 text-sm leading-6 text-stone-800">
                                     <p className="text-xs font-medium text-stone-500">
@@ -399,7 +402,7 @@ export default async function PatientPage({
                                   </div>
                                 )}
                                 {transcriptSpan.transcript_start_ms !== null && transcriptSpan.transcript_end_ms !== null ? (
-                                  <p className="mt-2 text-stone-600">Transcript segment: {transcriptSpan.transcript_start_ms}ms-{transcriptSpan.transcript_end_ms}ms</p>
+                                  <p className="mt-2 text-xs text-stone-600">Transcript segment: {transcriptSpan.transcript_start_ms}ms-{transcriptSpan.transcript_end_ms}ms</p>
                                 ) : null}
                               </details>
                             ) : null}
@@ -443,7 +446,7 @@ export default async function PatientPage({
 
           <aside className="space-y-4">
             <details className="rounded-md border border-stone-200 bg-white shadow-sm" id="conflict-review">
-              <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-stone-800 hover:bg-stone-50">
+              <summary className={sidebarSummaryClass}>
                 <span>Conflict review</span>
                 <span className="ml-auto mr-2 rounded-full bg-stone-100 px-2.5 py-1 text-xs font-medium text-stone-600">{countLabel(visibleFactConflicts.length, "conflict")}</span>
               </summary>
@@ -513,7 +516,7 @@ export default async function PatientPage({
             </details>
 
             <details className="rounded-md border border-stone-200 bg-white shadow-sm" id="patient-facing-review" open={Boolean(patientDraftSourceId)}>
-              <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-stone-800 hover:bg-stone-50">
+              <summary className={sidebarSummaryClass}>
                 <span>Patient-facing review</span>
                 <span className="ml-auto mr-2 rounded-full bg-stone-100 px-2.5 py-1 text-xs font-medium text-stone-600">{countLabel(visiblePatientFacingContent.length, "item")}</span>
               </summary>
@@ -563,7 +566,7 @@ export default async function PatientPage({
             <AiScribeComposer patientId={id} actorRole={actor?.role} />
             <TaskComposer patientId={id} users={assignableUsers} />
             <details className="rounded-md border border-stone-200 bg-white shadow-sm">
-              <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-stone-800 hover:bg-stone-50">
+              <summary className={sidebarSummaryClass}>
                 <span>Follow-up tasks</span>
                 <span className="ml-auto mr-2 rounded-full bg-stone-100 px-2.5 py-1 text-xs font-medium text-stone-600">{countLabel(visibleTasks.length, "task")}</span>
               </summary>

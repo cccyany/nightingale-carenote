@@ -51,6 +51,7 @@ const tealOutlineButtonClass =
   "rounded-md border border-teal-700 bg-white px-2 py-1 text-xs font-medium text-teal-900 hover:bg-teal-50 focus:outline-none focus:ring-2 focus:ring-teal-600 disabled:cursor-not-allowed disabled:opacity-55";
 const dangerButtonClass =
   "rounded-md border border-red-300 bg-white px-2 py-1 text-xs font-medium text-red-800 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:cursor-not-allowed disabled:opacity-55";
+const sidebarSummaryClass = "cursor-pointer px-4 py-3 text-base font-semibold text-stone-900 hover:bg-stone-50";
 
 const patientContentTypes = [
   ["visit_summary", "Visit summary"],
@@ -139,9 +140,10 @@ export function NoteComposer({ patientId }: { patientId: string }) {
   }
 
   return (
-    <details className="rounded-md border border-stone-200 bg-white p-4 shadow-sm">
-      <summary className="cursor-pointer text-base font-semibold">+ Add care-team note</summary>
-      <p className="mt-2 text-sm text-stone-600">Demo author choice; server authorization and RLS enforce writes.</p>
+    <details className="rounded-md border border-stone-200 bg-white shadow-sm">
+      <summary className={sidebarSummaryClass}>+ Add care-team note</summary>
+      <div className="border-t border-stone-100 p-4">
+      <p className="text-sm text-stone-600">Demo author choice; server authorization and RLS enforce writes.</p>
       <div className="mt-3 flex flex-wrap gap-2">
         {demoTokens.slice(0, 2).map(([value, label]) => (
           <button
@@ -157,6 +159,7 @@ export function NoteComposer({ patientId }: { patientId: string }) {
       <textarea className="mt-3 min-h-24 w-full rounded-md border border-stone-300 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600" onChange={(event) => setContent(event.target.value)} placeholder="Synthetic care-team note" value={content} />
       <button className={`${primaryButtonClass} mt-3 px-4 py-2`} disabled={!content.trim()} onClick={submit} type="button">Save note</button>
       {message ? <p className="mt-2 text-sm text-stone-700">{message}</p> : null}
+      </div>
     </details>
   );
 }
@@ -200,9 +203,9 @@ export function AiScribeComposer({ patientId, actorRole }: { patientId: string; 
   }
 
   return (
-    <details className="rounded-md border border-amber-200 bg-white p-4 shadow-sm">
-      <summary className="cursor-pointer text-base font-semibold">+ AI Scribe</summary>
-      <div className="mt-3 space-y-3">
+    <details className="rounded-md border border-amber-200 bg-white shadow-sm">
+      <summary className={sidebarSummaryClass}>+ AI Scribe</summary>
+      <div className="space-y-3 border-t border-stone-100 p-4">
         <div>
           <label className="text-sm font-medium text-stone-800" htmlFor="ai-scribe-type">Interaction type</label>
           <select
@@ -404,11 +407,12 @@ export function AmbientConsultComposer({ patientId, actorRole }: { patientId: st
   }
 
   return (
-    <section className="rounded-md border border-teal-200 bg-white p-4 shadow-sm">
+    <details className="rounded-md border border-teal-200 bg-white shadow-sm">
+      <summary className={sidebarSummaryClass}>Ambient consult</summary>
+      <div className="border-t border-stone-100 p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h2 className="text-base font-semibold text-stone-900">Ambient consult</h2>
-          <p className="mt-1 text-xs font-medium text-teal-800">Post-consult processing - AI output requires review</p>
+          <p className="text-xs font-medium text-teal-800">Post-consult processing - AI output requires review</p>
           <p className="mt-1 text-xs text-stone-600">Capture a clinician-patient or staff-patient consultation. Use synthetic audio only.</p>
         </div>
         <select className="rounded border border-stone-300 p-1.5 text-xs" onChange={(event) => setEntryType(event.target.value)} value={entryType}>
@@ -492,7 +496,8 @@ export function AmbientConsultComposer({ patientId, actorRole }: { patientId: st
           {mappingMessage ? <p className="mt-2 text-xs text-stone-600">{mappingMessage}</p> : null}
         </div>
       ) : null}
-    </section>
+      </div>
+    </details>
   );
 }
 
@@ -845,14 +850,16 @@ export function TaskComposer({ patientId, entryId, users }: { patientId: string;
   }
 
   return (
-    <details className="rounded-md border border-stone-200 bg-white p-4 shadow-sm">
-      <summary className="cursor-pointer text-base font-semibold">+ Assign follow-up</summary>
-      <input className="mt-3 w-full rounded border border-stone-300 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600" onChange={(event) => setTitle(event.target.value)} placeholder="Task title" value={title} />
+    <details className="rounded-md border border-stone-200 bg-white shadow-sm">
+      <summary className={sidebarSummaryClass}>+ Assign follow-up</summary>
+      <div className="border-t border-stone-100 p-4">
+      <input className="w-full rounded border border-stone-300 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600" onChange={(event) => setTitle(event.target.value)} placeholder="Task title" value={title} />
       <select className="mt-2 w-full rounded border border-stone-300 p-2" onChange={(event) => setAssignee(event.target.value)} value={assignee}>
         {users.map((user) => <option key={user.profile_id} value={user.profile_id}>{user.profiles?.display_name ?? user.profile_id} ({user.role})</option>)}
       </select>
       <input className="mt-2 w-full rounded border border-stone-300 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600" onChange={(event) => setDueDate(event.target.value)} type="date" value={dueDate} />
       <button className={`${primaryButtonClass} mt-3 px-4 py-2`} disabled={!title.trim() || !assignee} onClick={submit} type="button">Create task</button>
+      </div>
     </details>
   );
 }
