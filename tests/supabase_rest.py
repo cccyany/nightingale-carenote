@@ -103,3 +103,56 @@ def service_session() -> SupabaseSession:
     if not service_key:
         raise SupabaseUnavailable("SUPABASE_SERVICE_ROLE_KEY is not configured")
     return SupabaseSession(service_key, service_key)
+
+
+def admin_create_auth_user(user_id: str, email: str, password: str = "demo-password") -> None:
+    load_dotenv()
+    service_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    if not service_key:
+        raise SupabaseUnavailable("SUPABASE_SERVICE_ROLE_KEY is not configured")
+    request = Request(
+        f"{supabase_origin()}/auth/v1/admin/users",
+        data=json.dumps({
+            "id": user_id,
+            "email": email,
+            "password": password,
+            "email_confirm": True,
+            "user_metadata": {"synthetic_demo": True, "generated_demo_identity": True},
+        }).encode(),
+        method="POST",
+        headers={
+            "apikey": service_key,
+            "authorization": f"Bearer {service_key}",
+            "content-type": "application/json",
+        },
+    )
+    try:
+        with urlopen(request, timeout=20):
+            return
+    except HTTPError as error:
+        if error.status == 422:
+            return
+        raise
+
+
+def admin_delete_auth_user(user_id: str) -> None:
+    load_dotenv()
+    service_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    if not service_key:
+        raise SupabaseUnavailable("SUPABASE_SERVICE_ROLE_KEY is not configured")
+    request = Request(
+        f"{supabase_origin()}/auth/v1/admin/users/{user_id}",
+        method="DELETE",
+        headers={
+            "apikey": service_key,
+            "authorization": f"Bearer {service_key}",
+            "content-type": "application/json",
+        },
+    )
+    try:
+        with urlopen(request, timeout=20):
+            return
+    except HTTPError as error:
+        if error.status == 404:
+            return
+        raise

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { AppShell, actorForDemo } from "@/components/AppShell";
 import { CreateClinicForm } from "@/components/ClinicManagementActions";
 import { listManagedClinics, type AvailableProfile } from "@/lib/clinic-management";
@@ -19,6 +20,10 @@ export default async function ClinicsPage({
     listManagedClinics(demo),
     createSupabaseActorClient(demo)
   ]);
+  const { data: isPlatformAdmin } = await supabase.rpc("is_platform_admin", {});
+  if (!isPlatformAdmin && clinics.length === 1) {
+    redirect(`/admin/clinics/${clinics[0].id}?demo=${encodeURIComponent(demo)}`);
+  }
   const { data: profiles } = await supabase
     .from("profiles")
     .select("id, display_name, primary_role")
@@ -36,7 +41,7 @@ export default async function ClinicsPage({
               Provision clinics using the existing membership and RLS model. Production invitations are not implemented in this prototype.
             </p>
           </div>
-          <CreateClinicForm demo={demo} profiles={(profiles ?? []) as AvailableProfile[]} />
+          {isPlatformAdmin ? <CreateClinicForm demo={demo} profiles={(profiles ?? []) as AvailableProfile[]} /> : null}
         </header>
 
         <div className="mt-6 grid gap-4">

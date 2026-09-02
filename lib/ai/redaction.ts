@@ -21,7 +21,7 @@ const patterns: Array<{ class: RedactionClass; regex: RegExp }> = [
   { class: "id", regex: /\b[STFGM]\d{7}[A-Z]\b/gi },
   { class: "phone", regex: /(?:\+65[\s-]?)?(?:[689]\d{3}[\s-]?\d{4})\b/g },
   { class: "structured_id", regex: /\b(?:MRN|ID|IC|FIN)(?=[:#\s-])[:#\s-]*[A-Z0-9-]{5,}\b/gi },
-  { class: "name", regex: /\b(?:Jane Tan|Alex Lim|Sam Lee|Mina Koh|Avery Ong|Bo Chen)\b/g }
+  { class: "name", regex: /\b(?:Jane Tan|Alex Lim|Sam Lee|Mina Koh|Avery Ong|Bo Chen|Clara Ng)\b/g }
 ];
 const unresolvedNamePattern = /\b(?!(?:No known|Repeat renal|Patient reports|Patient denies|Clinician discussed|Doctor discussed|Nurse notes|Staff notes)\b)[A-Z][a-z]+ [A-Z][a-z]+\b/;
 

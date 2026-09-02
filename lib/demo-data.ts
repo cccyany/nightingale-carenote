@@ -8,6 +8,7 @@ export const clinics = [
 export const demoUsers: DemoUser[] = [
   {
     id: "user-patient-jane",
+    profileId: "10000000-0000-0000-0000-000000000001",
     token: "demo-patient",
     name: "Jane Tan",
     role: "patient",
@@ -17,6 +18,7 @@ export const demoUsers: DemoUser[] = [
   },
   {
     id: "user-staff-a",
+    profileId: "10000000-0000-0000-0000-000000000002",
     token: "demo-staff",
     name: "Sam Lee",
     role: "staff",
@@ -25,6 +27,7 @@ export const demoUsers: DemoUser[] = [
   },
   {
     id: "user-clinician-a",
+    profileId: "10000000-0000-0000-0000-000000000003",
     token: "demo-clinician",
     name: "Dr Mina Koh",
     role: "clinician",
@@ -33,14 +36,26 @@ export const demoUsers: DemoUser[] = [
   },
   {
     id: "user-admin-a",
+    profileId: "10000000-0000-0000-0000-000000000004",
     token: "demo-admin",
     name: "Avery Ong",
+    role: "admin",
+    clinicId: "clinic-a",
+    clinicName: "Clinic A",
+    platformAdmin: true
+  },
+  {
+    id: "user-clinic-admin-a",
+    profileId: "10000000-0000-0000-0000-000000000006",
+    token: "demo-clinic-admin-a",
+    name: "Clara Ng",
     role: "admin",
     clinicId: "clinic-a",
     clinicName: "Clinic A"
   },
   {
     id: "user-staff-b",
+    profileId: "10000000-0000-0000-0000-000000000005",
     token: "demo-clinic-b-staff",
     name: "Bo Chen",
     role: "staff",

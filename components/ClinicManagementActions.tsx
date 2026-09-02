@@ -109,7 +109,7 @@ export function AddClinicMemberForm({ clinicId, demo, profiles }: { clinicId: st
 
   return (
     <details className="rounded-md border border-stone-200 bg-white p-3">
-      <summary className="cursor-pointer text-sm font-semibold text-stone-800">Add administrator, clinician or staff</summary>
+      <summary className="cursor-pointer text-sm font-semibold text-stone-800">Add existing demo/profile</summary>
       <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_160px_auto]">
         <select className="rounded border border-stone-300 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600" onChange={(event) => setProfileId(event.target.value)} value={profileId}>
           <option value="">Choose existing user</option>

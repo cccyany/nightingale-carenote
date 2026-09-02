@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { clinicUuidBySlug } from "@/lib/demo-access";
 import { demoUsers } from "@/lib/demo-data";
 
 type AppShellProps = {
@@ -24,6 +25,9 @@ export function AppShell({ demo, patientId, patientName, clinicName, children, p
   const actor = actorForDemo(demo);
   const activeClinic = clinicName ?? actor?.clinicName ?? "Clinic";
   const patientsHref = demo ? `/patients?demo=${encodeURIComponent(demo)}` : "/login";
+  const clinicManagementHref = actor?.role === "admin" && !actor.platformAdmin
+    ? `/admin/clinics/${clinicUuidBySlug[actor.clinicId] ?? actor.clinicId}?demo=${encodeURIComponent(demo ?? "")}`
+    : null;
 
   if (patientView) {
     return (
@@ -64,9 +68,14 @@ export function AppShell({ demo, patientId, patientName, clinicName, children, p
             <Link className="rounded-md px-3 py-2 text-stone-700 hover:bg-stone-100 focus:outline-none focus:ring-2 focus:ring-teal-600" href="/login">
               Demo roles
             </Link>
-            {actor?.role === "admin" ? (
+            {actor?.platformAdmin ? (
               <Link className="rounded-md px-3 py-2 text-stone-700 hover:bg-stone-100 focus:outline-none focus:ring-2 focus:ring-teal-600" href={`/admin/clinics?demo=${encodeURIComponent(demo ?? "")}`}>
                 Clinics
+              </Link>
+            ) : null}
+            {clinicManagementHref ? (
+              <Link className="rounded-md px-3 py-2 text-stone-700 hover:bg-stone-100 focus:outline-none focus:ring-2 focus:ring-teal-600" href={clinicManagementHref}>
+                Clinic management
               </Link>
             ) : null}
             {patientId ? (
@@ -77,7 +86,7 @@ export function AppShell({ demo, patientId, patientName, clinicName, children, p
           </nav>
           <div className="rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-right text-sm">
             <p className="font-medium">{actor?.name ?? "No role selected"}</p>
-            <p className="text-stone-600">{displayRole(actor?.role)}</p>
+            <p className="text-stone-600">{actor?.platformAdmin ? "Platform Administrator" : actor?.role === "admin" ? "Clinic Administrator" : displayRole(actor?.role)}</p>
           </div>
         </div>
       </header>

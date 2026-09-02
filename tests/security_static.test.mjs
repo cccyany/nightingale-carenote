@@ -18,8 +18,12 @@ function walk(dir, predicate, results = []) {
 }
 
 test("normal patient-data routes do not import the Supabase admin service-role client", () => {
+  const allowedAdminProvisioningRoutes = new Set([
+    path.normalize(path.join("app", "api", "admin", "demo-people", "route.ts"))
+  ]);
   const files = walk("app", (file) => file.endsWith(".ts") || file.endsWith(".tsx"));
   const offenders = files.filter((file) => {
+    if (allowedAdminProvisioningRoutes.has(path.normalize(file))) return false;
     const text = fs.readFileSync(file, "utf8");
     return /createSupabaseAdminClient|@\/lib\/supabase\/admin|SUPABASE_SERVICE_ROLE_KEY/.test(text);
   });

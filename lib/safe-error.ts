@@ -20,7 +20,7 @@ const sensitivePatterns = [
   /\b[STFGM]\d{7}[A-Z]\b/gi,
   /(?:\+65[\s-]?)?(?:[689]\d{3}[\s-]?\d{4})\b/g,
   /\b(?:NRIC|FIN|IC|ID|passport|mrn|record)\s*[:#-]?\s*[A-Z0-9-]{4,}\b/gi,
-  /\b(?:Jane Tan|Alex Lim|Sam Lee|Mina Koh|Dr Mina Koh|Avery Ong|Bo Chen)\b/gi
+  /\b(?:Jane Tan|Alex Lim|Sam Lee|Mina Koh|Dr Mina Koh|Avery Ong|Bo Chen|Clara Ng)\b/gi
 ];
 
 export function sanitizeForLog(value: unknown): unknown {

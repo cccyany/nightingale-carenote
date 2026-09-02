@@ -21,12 +21,14 @@ export type EntryType =
 
 export type DemoUser = {
   id: string;
+  profileId?: string;
   token: string;
   name: string;
   role: Exclude<Role, "system">;
   clinicId: string;
   clinicName: string;
   patientId?: string;
+  platformAdmin?: boolean;
 };
 
 export type Patient = {
