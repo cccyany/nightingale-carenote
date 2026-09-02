@@ -15,7 +15,7 @@ const demoAccessMigration = readFileSync("supabase/migrations/025_demo_identity_
 const supabaseRequest = readFileSync("lib/supabase/request.ts", "utf8");
 
 test("Avery is presented as platform administrator, not Clinic A authority", () => {
-  assert.match(demoData, /name: "Avery Ong"[\s\S]*platformAdmin: true/);
+  assert.match(demoData, /name: "Avery Ong"[\s\S]*clinicId: "platform"[\s\S]*clinicName: "Platform"[\s\S]*platformAdmin: true/);
   assert.match(loginPage, /Platform Administrator/);
   assert.match(loginPage, /Platform administrator identities are provisioned separately from clinic-scoped demo roles to prevent self-service privilege escalation/);
   assert.doesNotMatch(loginPage, /Avery Ong[\s\S]{0,200}Admin · Clinic A/);

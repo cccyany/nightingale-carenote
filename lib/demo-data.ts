@@ -40,8 +40,8 @@ export const demoUsers: DemoUser[] = [
     token: "demo-admin",
     name: "Avery Ong",
     role: "admin",
-    clinicId: "clinic-a",
-    clinicName: "Clinic A",
+    clinicId: "platform",
+    clinicName: "Platform",
     platformAdmin: true
   },
   {

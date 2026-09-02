@@ -13,6 +13,8 @@ BO_PROFILE_ID = "10000000-0000-0000-0000-000000000005"
 SAM_PROFILE_ID = "10000000-0000-0000-0000-000000000002"
 DR_MINA_PROFILE_ID = "10000000-0000-0000-0000-000000000003"
 AVERY_PROFILE_ID = "10000000-0000-0000-0000-000000000004"
+CLARA_PROFILE_ID = "10000000-0000-0000-0000-000000000006"
+CLINIC_B_ID = "20000000-0000-0000-0000-000000000002"
 
 
 @pytest.fixture(scope="module")
@@ -74,6 +76,38 @@ def test_platform_admin_can_create_clinic_with_initial_admin(platform_admin_sess
     assert any(row["id"] == clinic_c for row in clinics)
 
 
+def test_avery_platform_admin_has_no_clinic_a_membership_but_can_manage_clinics(
+    platform_admin_session, service
+) -> None:
+    status, avery_memberships = service.get(
+        "clinic_memberships",
+        {"select": "clinic_id,profile_id,role", "clinic_id": f"eq.{CLINIC_A_ID}", "profile_id": f"eq.{AVERY_PROFILE_ID}"},
+    )
+    assert status == 200, avery_memberships
+    assert avery_memberships == []
+
+    status, clara_memberships = service.get(
+        "clinic_memberships",
+        {"select": "clinic_id,profile_id,role", "clinic_id": f"eq.{CLINIC_A_ID}", "profile_id": f"eq.{CLARA_PROFILE_ID}", "role": "eq.admin"},
+    )
+    assert status == 200, clara_memberships
+    assert clara_memberships == [{"clinic_id": CLINIC_A_ID, "profile_id": CLARA_PROFILE_ID, "role": "admin"}]
+
+    status, platform_rows = service.get("platform_admins", {"select": "profile_id", "profile_id": f"eq.{AVERY_PROFILE_ID}"})
+    assert status == 200, platform_rows
+    assert platform_rows == [{"profile_id": AVERY_PROFILE_ID}]
+
+    status, clinic_a = platform_admin_session.rpc("get_clinic_management", {"p_clinic_id": CLINIC_A_ID})
+    assert status == 200, clinic_a
+    assert clinic_a["status"] == "ok"
+    assert any(row["profile_id"] == CLARA_PROFILE_ID and row["role"] == "admin" for row in clinic_a["memberships"])
+    assert not any(row["profile_id"] == AVERY_PROFILE_ID for row in clinic_a["memberships"])
+
+    status, clinic_b = platform_admin_session.rpc("get_clinic_management", {"p_clinic_id": CLINIC_B_ID})
+    assert status == 200, clinic_b
+    assert clinic_b["status"] == "ok"
+
+
 def test_ordinary_clinic_admin_cannot_create_arbitrary_new_clinic(clinic_b_staff_session, clinic_c) -> None:
     status, payload = clinic_b_staff_session.rpc(
         "platform_create_clinic",
@@ -90,7 +124,7 @@ def test_ordinary_clinic_admin_cannot_create_arbitrary_new_clinic(clinic_b_staff
 def test_clinic_admin_can_add_members_and_patient_inside_own_clinic(clinic_b_staff_session, service, clinic_c) -> None:
     status, clinician_membership = clinic_b_staff_session.rpc(
         "provision_clinic_member",
-        {"p_clinic_id": clinic_c, "p_profile_id": AVERY_PROFILE_ID, "p_role": "clinician"},
+        {"p_clinic_id": clinic_c, "p_profile_id": DR_MINA_PROFILE_ID, "p_role": "clinician"},
     )
     assert status == 200, clinician_membership
 
@@ -117,7 +151,7 @@ def test_clinic_admin_can_add_members_and_patient_inside_own_clinic(clinic_b_sta
         {"select": "profile_id,role", "clinic_id": f"eq.{clinic_c}"},
     )
     assert status == 200, memberships
-    assert {"profile_id": AVERY_PROFILE_ID, "role": "clinician"} in memberships
+    assert {"profile_id": DR_MINA_PROFILE_ID, "role": "clinician"} in memberships
     assert {"profile_id": SAM_PROFILE_ID, "role": "staff"} in memberships
 
     status, patient = clinic_b_staff_session.get("patients", {"select": "id,clinic_id", "id": f"eq.{patient_id}"})
