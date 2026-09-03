@@ -548,11 +548,13 @@ Only start after all core requirements pass.
 - [x] Transcribe audio
 - [x] Add speaker labels
 - [x] Add timestamps
-- [x] Redact before LLM extraction
+- [x] Redact transcript text before downstream LLM extraction/summarization
 - [x] Create AI-scribed entry
 - [x] Link summary to transcript timestamps
 - [x] Mark uncertain transcript segments
 - [x] Document noisy/multilingual limitations
+
+Note: Ambient Consult is post-consult. Real Gemini transcription is used when configured; deterministic transcription is retained for tests/offline fixtures.
 
 Suggested commit:
 
@@ -759,3 +761,5 @@ Privacy:
 - [x] ATTRIBUTION.txt is complete
 - [x] Demo video scenarios are technically ready
 - [ ] git status is clean
+
+Note: this checklist records technical readiness inside the repository. The final submitted brief and demo video are prepared separately from this source repo.

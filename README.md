@@ -27,9 +27,9 @@ Jane Tan is the golden demo patient in Clinic A:
 - Aug 2026: repeat renal panel discussed but not ordered
 - medication/dose conflict, approved patient-facing content, HOT/WARM/COLD ranking, adaptive importance, and optional synthetic voice capture
 
-The historical AI Scribe rows above are seeded synthetic fixtures for longitudinal context. To demonstrate live generation, open Jane as the clinician demo actor, expand `+ AI Scribe`, paste a synthetic transcript, and click `Generate AI Summary`. That user-triggered flow calls Gemini when `GEMINI_API_KEY` is configured, persists a new unverified internal AI entry, and links it to the original synthetic transcript source.
+The historical AI Scribe rows above are seeded synthetic fixtures for longitudinal context. To demonstrate live generation, open Jane as the clinician demo actor, expand `+ AI Scribe`, paste a synthetic transcript, and click `Generate AI Summary`. To demonstrate Ambient Consult, use the post-consult record/upload panel with synthetic audio. These user-triggered flows call Gemini when `GEMINI_API_KEY` is configured, persist new unverified internal AI entries, and link them to the original synthetic transcript source.
 
-Care Glance defaults to the top 3 presentable active items and can expand to at most 5. Jane currently has 5 presentable active items after golden-demo artifact filtering. Runtime AI Scribe cards display the full generated summary, with key points and provider metadata under `AI details`.
+Care Glance defaults to the top 3 presentable active items and can expand to at most 5. Semantic dedupe occurs before the final top-N limit so duplicate conflict rows cannot starve distinct active concerns such as medication or dose conflicts. Runtime AI Scribe cards display the full generated summary, with key points and provider metadata under `AI details`.
 
 Visible care-team timeline filters are `All`, `AI Scribe`, `Clinician`, `Staff`, and `Patient`. The underlying `system` author role and backend filter support remain implemented for AI-scribed/system-generated records.
 
@@ -47,8 +47,11 @@ flowchart LR
   DB --> Timeline[Care entries + versions]
   DB --> Trust[Provenance + facts + conflicts]
   DB --> Glance[Persisted ranked Glance items]
-  Raw[Patient-derived text] --> Redact[PHI redaction gate]
+  Text[Patient-derived text] --> Redact[PHI redaction gate]
   Redact --> Provider[Gemini 3.5 Flash or deterministic mock]
+  Audio[Synthetic consult audio] --> ASR[Gemini transcription]
+  ASR --> Transcript[Speaker-labelled transcript]
+  Transcript --> Redact
   Provider --> Extract[Structured candidates]
   Extract --> Trust
 ```
@@ -111,7 +114,7 @@ TLS and encryption at rest are deployment assumptions of the configured Supabase
 
 ## Collaboration, Revisions, and Concurrency
 
-Staff create staff notes; clinicians create clinician notes. Each edit creates an immutable `entry_versions` snapshot and increments `current_version`. Reverting creates a new version containing the older content; intermediate versions remain. Audit events store actor/action/resource/version metadata, not raw clinical note text.
+Staff create staff notes; clinicians create clinician notes. Each edit creates an immutable entry-local `entry_versions` snapshot and increments `current_version`. Revision History presents version-to-version changes from those snapshots. Reverting creates a new version containing the older content; intermediate versions remain. Audit events store actor/action/resource/version metadata, not raw clinical note text.
 
 Clinical edits use optimistic concurrency. Writes include `expected_version`; stale same-entry edits fail with HTTP 409 rather than silently using last-write-wins.
 
@@ -119,7 +122,7 @@ Clinical edits use optimistic concurrency. Writes include `expected_version`; st
 
 AI-scribed entries are `author_role = system` and remain visually distinct from human notes. Runtime AI Scribe entries start as unverified internal content and retain provider/model metadata plus provenance to the original synthetic transcript/session. The server authorizes the care-team actor before provider invocation, then sends only redacted text through the safe gateway. Structured extraction is preferred over generation for clinical facts. Candidates require exact evidence text, character offsets, source entry/version or transcript source, and provenance resolution before becoming trusted.
 
-Provenance spans resolve to source entry, version, evidence offsets, evidence text, and transcript timestamps where applicable. If offsets are invalid, evidence text does not match, source is missing, or evidence is ambiguous, the system abstains and marks the item `needs_review`.
+Provenance spans resolve to source entry, version, evidence offsets, evidence text, transcript timestamps where applicable, and direct `transcript_segment_id` for voice-derived evidence. Entry-level AI Scribe Review Source shows the full immutable transcript session with evidence highlights; fact and Glance source links prefer the exact transcript segment. If offsets are invalid, evidence text does not match, source is missing, or evidence is ambiguous, the system abstains and marks the item `needs_review`.
 
 Risk is clinical severity; importance is what should be seen first now. Deterministic risk floors include allergy conflict, medication conflict, medication-dose conflict, and unresolved critical task as HIGH. A model suggestion may raise risk but cannot lower these floors.
 
@@ -149,11 +152,13 @@ Decay affects ranking/read behavior only. Source history, versions, provenance, 
 
 ## PHI Redaction and AI Providers
 
-Every LLM call goes through the centralized safe AI gateway:
+Every text-generating LLM call goes through the centralized safe AI gateway:
 
 `raw input -> redaction -> verification -> provider`
 
 The current redactor detects synthetic names, Singapore NRIC/FIN-like identifiers, phone numbers, email addresses, and obvious structured identifiers. Metadata reports classes/counts without exposing original values. If verification cannot establish a safe payload, the request is blocked and marked for review.
+
+Ambient Consult has a separate audio boundary: raw audio is sent to the ASR provider first because transcript text does not exist yet. The resulting transcript then enters the same redaction gateway before downstream Gemini summarization. The repository does not claim raw-audio PHI redaction before cloud ASR.
 
 The provider abstraction supports a real Google Gemini adapter and deterministic/mock providers. If `GEMINI_API_KEY` is configured, server-side AI-scribe flows use Gemini with `GEMINI_MODEL` defaulting to `gemini-3.5-flash`. Ambient Consult transcription uses the dedicated `GEMINI_TRANSCRIBE_MODEL`, defaulting to `gemini-3.5-transcribe`. If no Gemini key is configured, deterministic mock providers remain available only for tests and explicit offline fixture paths.
 
@@ -167,9 +172,11 @@ Phase A Ambient Consult is post-consult processing, not realtime monitoring:
 
 `record/upload audio -> ASR transcription -> speaker-labelled timestamped transcript -> transcript redaction -> downstream AI Scribe -> deterministic extraction/conflicts/Glance -> human review`
 
-The clinical workspace supports browser `MediaRecorder` capture and audio upload for synthetic WAV, MP3, M4A, and WebM files. Audio is sent to the configured ASR provider before text redaction because transcript text does not exist yet. The resulting transcript is then sent through `invokeSafeLlm()` so textual PHI redaction occurs before downstream generative summarization. Voice-derived AI Scribe entries remain unverified/internal, clinical facts remain needs-review, and provenance resolves back to transcript evidence with timestamps.
+The clinical workspace supports browser `MediaRecorder` capture and audio upload for synthetic WAV, MP3, M4A, and WebM files. With `GEMINI_API_KEY` configured, the Gemini transcription provider uploads audio through the Gemini Files API and requests `GEMINI_TRANSCRIBE_MODEL`, default `gemini-3.5-transcribe`, through the interactions API. The default ASR timeout is 30 seconds via `TRANSCRIPTION_PROVIDER_TIMEOUT_MS`.
 
-Production raw-audio processing would require an appropriate ASR privacy/retention boundary, DPA, or on-device/self-hosted transcription. This repository does not claim validated noisy-room, Hokkien/Malay/English code-switching, diarization, or streaming allergy detection.
+Audio is sent to the configured ASR provider before text redaction because transcript text does not exist yet. The resulting transcript is then sent through `invokeSafeLlm()` so textual PHI redaction occurs before downstream generative summarization. Speaker labels and clinical role mapping are stored separately. Voice-derived AI Scribe entries remain unverified/internal, clinical facts remain needs-review, and provenance resolves back to direct transcript segments with speaker labels and timestamps.
+
+Real synthetic two-speaker validation confirmed the English post-consult path, diarization, timestamps, transcript persistence, downstream AI Scribe, deterministic facts/conflicts/Glance, and direct transcript-segment provenance. Multilingual/code-switched validation remains partial: English clinical content stayed usable, Malay degraded, and Hokkien-style phrases were unreliable. Production raw-audio processing would require an appropriate ASR privacy/retention boundary, DPA, or on-device/self-hosted transcription. This repository does not claim realtime streaming allergy detection, noisy-room robustness, or production multilingual ASR.
 
 Targeted audio checks:
 
@@ -193,7 +200,7 @@ Latest measured warm Supabase/PostgREST path in `docs/performance/glance-benchma
 - concurrency: 1
 - network included: yes
 - median P95 across 5 runs: 193.11 ms
-- individual-run P95 range: 173.04–210.86 ms
+- individual-run P95 range: 173.04-210.86 ms
 - last run: P50 149.37 ms, P95 196.78 ms, P99 402.57 ms
 - failures: 0
 - target: P95 <= 300 ms
@@ -223,7 +230,7 @@ These are prototype evaluation evidence on small synthetic fixtures, not clinica
 - Synthetic fixtures are intentionally small and cannot establish real-world accuracy.
 - Physical archival/compression is deferred; HOT/WARM/COLD currently affects classification and ranking only.
 - Collaboration uses section/entry optimistic concurrency rather than CRDTs.
-- Revision history stores full snapshots rather than complex semantic diff objects.
+- Revision history stores full snapshots and presents version-to-version diffs from those snapshots; it is not a CRDT or semantic merge system.
 - AI and transcription providers are abstracted; Gemini can be enabled with a server-only key, and deterministic mock providers keep tests/offline demos working without paid credentials.
 - Ambient Consult is post-consult audio processing; realtime streaming consult alerts are not implemented.
-- Phone-only patient identity, WhatsApp/SMS/email delivery, and realtime streaming consult alerts are not implemented in this repository.
+- Phone-only patient identity, WhatsApp/SMS/email delivery, already-sent patient-content recall, full provider failover, automatic stale-dependent recomputation, and realtime streaming consult alerts are not implemented in this repository.

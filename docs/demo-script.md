@@ -37,7 +37,7 @@ Target length: 6 to 8 minutes.
 5. Confirm or highlight an AI-derived phrase where the flow is available.
 6. Edit the clinician plan.
 7. Open revision history.
-8. Show the version labels, actor, timestamp, basic diff summary, and revert action.
+8. Show the version labels, actor, timestamp, version-to-version diff, and revert action.
 9. Mention that stale same-entry edits return HTTP 409 rather than last-write-wins.
 
 ## Scenario C: Longitudinal Context and Learning
@@ -61,8 +61,9 @@ Target length: 6 to 8 minutes.
 
 1. Use a synthetic input containing a synthetic name, NRIC/FIN-like ID, and Singapore phone number.
 2. Show the redacted LLM-bound payload with placeholders.
-3. Explain that all provider calls go through raw input -> redaction -> verification -> provider.
+3. Explain that text-generating LLM calls go through raw input -> redaction -> verification -> provider.
 4. Mention that redaction metadata reports classes/counts without storing original PHI.
+5. For Ambient Consult, explain the separate boundary: raw audio goes to ASR first, then transcript text is redacted before downstream generative summarization.
 
 ## Patient-Facing Safety
 
@@ -78,9 +79,9 @@ Only include if the flow is smooth and time remains.
 
 1. Label the capture as synthetic/demo.
 2. Show speaker-labelled transcript segments and timestamps.
-3. Explain transcription -> transcript -> redaction -> AI extraction/summarization.
-4. Show provenance back to a transcript timestamp.
-5. State the limitations: noisy rooms, overlapping speech, diarization, code-switching, and multilingual medical terminology are not production-validated.
+3. Explain audio -> Gemini transcription -> transcript persistence -> redaction -> AI extraction/summarization.
+4. Show provenance back to the exact transcript segment and timestamp.
+5. State the limitations: the flow is post-consult, not realtime; noisy rooms, overlapping speech, production multilingual reliability, and live alerts are not implemented.
 
 ## Performance Close
 
@@ -91,7 +92,7 @@ Mention, do not benchmark live unless useful:
 - concurrency: 1
 - network included
 - median P95 across five consecutive runs: 193.11 ms
-- individual-run P95 range: 173.04–210.86 ms
+- individual-run P95 range: 173.04-210.86 ms
 - last run: P50 149.37 ms, P95 196.78 ms, P99 402.57 ms
 - target: P95 <= 300 ms
 

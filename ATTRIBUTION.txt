@@ -111,7 +111,7 @@ Models, transcription, assets, and fonts
   License/terms: repository code; no external service required.
 
 - Gemini transcription provider
-  Purpose: Phase A post-consult Ambient Consult audio transcription.
+  Purpose: Phase A post-consult Ambient Consult audio transcription through Gemini file upload and interactions API.
   Model ID used by default: gemini-3.5-transcribe.
   Terms/license: Google hosted service/API terms require manual verification against the current Google AI for Developers terms before external distribution or production use.
 

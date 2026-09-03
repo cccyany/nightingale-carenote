@@ -359,6 +359,8 @@ BLOCK LLM CALL
 
 Use synthetic test cases to evaluate redaction behavior.
 
+Ambient audio is a separate boundary: raw audio reaches the ASR provider before transcript text exists. The transcript then follows the redaction and verification path before downstream generative LLM summarization.
+
 ---
 
 # 15. AI Extraction
@@ -593,19 +595,22 @@ Persistent safety information should resist decay:
 
 If implementation time permits:
 
-Support synthetic consult audio.
+Support post-consult synthetic consult audio.
 
 Pipeline:
 
 audio
-→ transcription
-→ speaker-labelled segments
-→ PHI redaction
-→ extraction
+→ ASR transcription
+→ speaker-labelled timestamped segments
+→ transcript persistence
+→ PHI redaction before downstream generative LLM
 → AI-scribed entry
-→ timestamp provenance
+→ deterministic extraction/conflicts/Glance
+→ direct transcript-segment provenance
 
 Low-confidence transcript segments should be marked uncertain and should not automatically produce high-risk canonical facts.
+
+This bonus path is post-consult only. It does not implement realtime streaming, live alerts, or production multilingual/noisy-room ASR guarantees.
 
 This feature must not compromise completion of core requirements.
 

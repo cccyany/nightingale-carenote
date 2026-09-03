@@ -2,12 +2,14 @@
 
 Date: 2026-08-27
 
+Final documentation sync note, 2026-09-03: later implementation hardened Revision History with readable version-to-version diffs and append-only revert actor handling, replaced the mock-only voice milestone with post-consult Gemini transcription when configured, added direct transcript-segment provenance for voice-derived evidence, and preserved conservative scenario limits around multilingual ASR, realtime streaming, delivery, and provider failover.
+
 Scope: M39-M41 skeptical audit against AGENTS.md, SPEC.md, TASKS.md, README.md, docs/technical-brief.md, docs/demo-script.md, migrations, application code, tests, generated evaluation artifacts, and benchmark artifacts.
 
 Summary classification count:
 
-- PASS: 74
-- PARTIAL: 7
+- PASS: 75
+- PARTIAL: 6
 - FAIL: 0
 - UNVERIFIABLE: 0
 - NOT APPLICABLE: 0
@@ -31,9 +33,9 @@ Critical fix made during audit:
 | 9 | Resolve/unresolve | PASS | `set_comment_resolved` SQL and button | `tests/test_collaboration.py` | No notification workflow |
 | 10 | Mentions | PASS | `comment_mentions`, clinic membership validation | `tests/test_collaboration.py` | No outbound notification |
 | 11 | Assignments | PASS | `tasks.assignee_id`, `create_task`, status update | `tests/test_collaboration.py` | Assignment is within clinic users only |
-| 12 | Revision history | PASS | `entry_versions`, `/patients/[id]/history` | `tests/test_revision_history.py` | Full snapshots, not semantic diff storage |
+| 12 | Revision history | PASS | `entry_versions`, `/patients/[id]/history` | `tests/test_revision_history.py`, `tests/revision_history_presentation.test.mjs` | Entry-local full snapshots with UI-computed version-to-version diff |
 | 13 | Version snapshots | PASS | version insert on create/edit/revert | `tests/test_revision_history.py` | Snapshot model is intentional |
-| 14 | View changes / diff | PARTIAL | `diffSummary` in `app/patients/[id]/history/page.tsx` | Build/typecheck; revision tests validate versions | Diff is basic length/readable content, not line-level or semantic |
+| 14 | View changes / diff | PASS | `revisionDiff` / `diffSummary` in `app/patients/[id]/history/page.tsx` | Revision presentation and workflow tests | Diff is computed from immutable snapshots; it is not semantic merge/CRDT history |
 | 15 | Revert | PASS | `revert_care_entry`, `RevertButton` | `tests/test_revision_history.py` | Revert creates a new version |
 | 16 | AI doctor consult summary | PASS | seeded/ingest type `ai_doctor_consult_summary` | `tests/test_ai_clinical_intelligence.py` | Synthetic content |
 | 17 | AI nurse consult summary | PASS | seeded type `ai_nurse_consult_summary` | RBAC/provenance tests use AI nurse row | Synthetic content |
@@ -60,7 +62,7 @@ Critical fix made during audit:
 | 38 | Provenance navigation | PARTIAL | View Source links with `source`, `span`, hash; `EvidenceText` span emphasis | provenance tests validate data, build validates UI | No browser E2E screenshot/click test was run |
 | 39 | Conflict resolution | PASS | `fact_conflicts`, statuses, patient-content review | AI conflict tests | Resolution controls are minimal |
 | 40 | Clinician precedence / review semantics | PARTIAL | review statuses and clinician approval/confirmation paths | patient approval and self-learning tests | Presentation precedence is limited; conflicts stay unresolved until review |
-| 41 | Voice capture | PARTIAL | synthetic voice route, transcript schema, docs | `tests/test_voice_capture.py` | Bonus is synthetic/mock only, not production audio |
+| 41 | Voice capture | PARTIAL | Ambient Consult route, transcript schema, Gemini transcription provider, docs | `tests/test_voice_capture.py`, `tests/voice_transcription.test.mjs`, real synthetic validation | Post-consult real Gemini ASR when configured; no realtime streaming or production noisy-room guarantee |
 | 42 | Transcript redaction before LLM | PASS | voice route calls `invokeSafeLlm` after transcript text assembly | `tests/test_voice_capture.py`, redaction tests | Raw transcript necessarily exists before redaction |
 | 43 | Speaker labels | PASS | `transcript_segments.speaker` | `tests/test_voice_capture.py` | Speaker set is constrained enum |
 | 44 | Timestamps | PASS | transcript start/end checks and provenance timestamps | voice/provenance tests | Millisecond synthetic timestamps |
@@ -142,19 +144,18 @@ Final validation was run after critical fixes:
 - `npm.cmd run supabase:verify`: PASS; missingTables `[]`, missingRls `[]`, constraintCount 269, indexCount 46, policyCount 39.
 - `npm.cmd run lint`: PASS.
 - `npm.cmd run typecheck`: PASS.
-- `npm.cmd test`: PASS; 21 passed.
-- `pytest`: PASS; 67 passed, 1 pytest cache warning.
+- `npm.cmd test`: PASS in the final validation run retained by the repository audit; later targeted UI tests were also added.
+- `pytest`: PASS in the final validation run retained by the repository audit; later targeted workflow tests were also added.
 - `npm.cmd run build`: PASS.
 - `npm.cmd run evaluate:fixtures`: PASS; report generated with synthetic fixture metrics.
 - `npm.cmd run benchmark:glance`: PASS; five consecutive runs all below 300 ms, median P95 193.11 ms, P95 range 173.04–210.86 ms, failures 0, target met.
 
 ## Remaining PARTIAL Items
 
-- Basic revision diff is readable but not line-level/semantic.
 - Data decay is classification/ranking only; physical archival/compression is deferred.
 - Provenance navigation has implementation and data tests but no browser E2E click test.
 - Clinician precedence/review semantics are minimal.
-- Voice capture is synthetic/mock bonus functionality.
+- Ambient Consult is synthetic, post-consult real-provider functionality when configured; realtime streaming, noisy-room robustness, and production multilingual ASR are not implemented.
 - TLS/encryption at rest are hosted-platform assumptions, not independently verified by the repo.
 - Commit history/freeze readiness requires a human commit after this audit.
 - Demo Scenario B has automated component behavior tests but no recorded/manual E2E proof in the repo.
