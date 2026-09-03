@@ -182,21 +182,26 @@ function transcriptSpans(entry: CareNoteEntry) {
   return entry.provenance_spans?.filter((span) => span.provenance_sources?.source_kind === "transcript" && span.provenance_sources.source_content) ?? [];
 }
 
-function evidenceRangesForTranscript(entry: CareNoteEntry, sourceContent: string) {
+function evidenceRangesForTranscript(entry: CareNoteEntry, sourceContent: string, selectedSpanId?: string) {
   return transcriptSpans(entry)
     .map((span) => ({
       start: span.char_start,
       end: span.char_end,
-      id: span.id
+      id: span.id,
+      selected: span.id === selectedSpanId
     }))
-    .filter((range): range is { start: number; end: number; id: string } =>
+    .filter((range): range is { start: number; end: number; id: string; selected: boolean } =>
       range.start !== null &&
       range.end !== null &&
       range.start >= 0 &&
       range.end > range.start &&
       range.end <= sourceContent.length
     )
-    .sort((left, right) => left.start - right.start);
+    .sort((left, right) => {
+      if (left.start !== right.start) return left.start - right.start;
+      if (left.selected !== right.selected) return left.selected ? -1 : 1;
+      return (right.end - right.start) - (left.end - left.start);
+    });
 }
 
 function directTranscriptSegment(span: NonNullable<CareNoteEntry["provenance_spans"]>[number] | null) {
@@ -227,6 +232,11 @@ function directTranscriptSegments(entry: CareNoteEntry) {
 
 function patientSafeDemoTokenForProfile(profileId: string | null | undefined) {
   return demoUsers.find((user) => user.role === "patient" && user.profileId === profileId)?.token ?? null;
+}
+
+function sourceEntryForFact(fact: { source_entry_id?: string | null; provenance_spans?: { entry_id: string | null } | null } | undefined, entryById: Map<string, CareNoteEntry>) {
+  const entryId = fact?.source_entry_id ?? fact?.provenance_spans?.entry_id;
+  return entryId ? entryById.get(entryId) : undefined;
 }
 
 function MultiEvidenceText({ content, ranges }: { content: string; ranges: Array<{ start: number; end: number; id: string }> }) {
@@ -281,7 +291,7 @@ export default async function PatientPage({
     .flatMap((item) => item.patient_content_sources ?? [])
     .find((source) => source.provenance_span_id === sourceSpanId && source.source_entry_id === sourceEntryId)
     ?.provenance_spans ?? result.clinicalFacts
-    .find((fact) => fact.provenance_span_id === sourceSpanId && fact.provenance_spans?.entry_id === sourceEntryId)
+    .find((fact) => fact.provenance_span_id === sourceSpanId && (fact.source_entry_id ?? fact.provenance_spans?.entry_id) === sourceEntryId)
     ?.provenance_spans;
   const commentsByEntry = new Map<string, typeof result.comments>();
   for (const comment of result.comments) {
@@ -382,7 +392,7 @@ export default async function PatientPage({
                         const showHighlight = sourceEntryId === entry.id && !aiMeta;
                         const transcriptSpan = aiMeta ? firstTranscriptSpan(entry) : null;
                         const transcriptSource = transcriptSpan?.provenance_sources?.source_content ?? "";
-                        const transcriptRanges = aiMeta && transcriptSource ? evidenceRangesForTranscript(entry, transcriptSource) : [];
+                        const transcriptRanges = aiMeta && transcriptSource ? evidenceRangesForTranscript(entry, transcriptSource, sourceEntryId === entry.id ? sourceSpanId : undefined) : [];
                         const linkedTranscriptSegments = aiMeta ? directTranscriptSegments(entry) : [];
                         return (
                           <article
@@ -507,8 +517,8 @@ export default async function PatientPage({
                   {visibleFactConflicts.map((conflict) => {
                     const factA = factById.get(conflict.fact_a_id);
                     const factB = factById.get(conflict.fact_b_id);
-                    const entryA = factA?.provenance_spans?.entry_id ? entryById.get(factA.provenance_spans.entry_id) : undefined;
-                    const entryB = factB?.provenance_spans?.entry_id ? entryById.get(factB.provenance_spans.entry_id) : undefined;
+                    const entryA = sourceEntryForFact(factA, entryById);
+                    const entryB = sourceEntryForFact(factB, entryById);
                     const [earlierEvidence, laterEvidence] = chronologicalConflictEvidence([
                       { side: "fact_a", fact: factA, entry: entryA },
                       { side: "fact_b", fact: factB, entry: entryB }

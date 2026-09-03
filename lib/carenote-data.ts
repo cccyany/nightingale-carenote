@@ -110,6 +110,8 @@ export type ClinicalFact = {
   authority_role: string;
   evidence_confidence: number;
   review_status: string;
+  source_entry_id: string | null;
+  source_version_id: string | null;
   provenance_span_id: string;
     provenance_spans: {
     entry_id: string | null;
@@ -304,7 +306,7 @@ export async function getPatientCareNote(patientId: string, filter: TimelineFilt
         .order("importance_score", { ascending: false }),
       supabase
         .from("clinical_facts")
-        .select("id, entity_type, normalized_entity, value, unit, assertion, authority_role, evidence_confidence, review_status, provenance_span_id, provenance_spans:provenance_span_id(entry_id, char_start, char_end, evidence_text, transcript_segment_id)")
+        .select("id, entity_type, normalized_entity, value, unit, assertion, authority_role, evidence_confidence, review_status, source_entry_id, source_version_id, provenance_span_id, provenance_spans:provenance_span_id(entry_id, char_start, char_end, evidence_text, transcript_segment_id)")
         .eq("patient_id", patientId)
         .order("created_at", { ascending: false })
         .limit(100),

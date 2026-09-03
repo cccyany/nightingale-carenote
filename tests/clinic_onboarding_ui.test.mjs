@@ -90,7 +90,31 @@ test("AI Scribe Review Source renders full transcript while preserving linked se
   assert.match(patientPage, /MultiEvidenceText content=\{transcriptSource\} ranges=\{transcriptRanges\}/);
   assert.match(patientPage, /Linked evidence segments/);
   assert.match(patientPage, /directTranscriptSegments\(entry\)/);
+  assert.match(patientPage, /const transcriptSpan = aiMeta \? firstTranscriptSpan\(entry\) : null/);
   assert.doesNotMatch(patientPage, /content=\{transcriptSegment\.text\}/);
+});
+
+test("conflict View Source keeps displayed fact source and selected transcript span", () => {
+  const patientPage = readFileSync("app/patients/[id]/page.tsx", "utf8");
+  const careData = readFileSync("lib/carenote-data.ts", "utf8");
+
+  assert.match(careData, /source_entry_id, source_version_id, provenance_span_id/);
+  assert.match(patientPage, /function sourceEntryForFact/);
+  assert.match(patientPage, /fact\?\.source_entry_id \?\? fact\?\.provenance_spans\?\.entry_id/);
+  assert.match(patientPage, /sourceEntryForFact\(factA, entryById\)/);
+  assert.match(patientPage, /sourceEntryForFact\(factB, entryById\)/);
+  assert.match(patientPage, /fact\.provenance_span_id === sourceSpanId && \(fact\.source_entry_id \?\? fact\.provenance_spans\?\.entry_id\) === sourceEntryId/);
+  assert.match(patientPage, /span=\$\{earlierEvidence\.fact\?\.provenance_span_id \?\? ""\}/);
+  assert.match(patientPage, /span=\$\{laterEvidence\.fact\?\.provenance_span_id \?\? ""\}/);
+});
+
+test("Review Source prioritizes selected exact span over overlapping generic spans", () => {
+  const patientPage = readFileSync("app/patients/[id]/page.tsx", "utf8");
+
+  assert.match(patientPage, /evidenceRangesForTranscript\(entry, transcriptSource, sourceEntryId === entry\.id \? sourceSpanId : undefined\)/);
+  assert.match(patientPage, /selected: span\.id === selectedSpanId/);
+  assert.match(patientPage, /left\.selected !== right\.selected/);
+  assert.match(patientPage, /right\.end - right\.start/);
 });
 
 test("clinic-level member and patient actions live inside clinic management", () => {
