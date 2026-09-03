@@ -1169,11 +1169,13 @@ export function PatientContentStatusButtons({
 export function RevertButton({
   entryId,
   expectedVersion,
-  version
+  version,
+  actorToken
 }: {
   entryId: string;
   expectedVersion: number;
   version: number;
+  actorToken: string;
 }) {
   const router = useRouter();
   const [message, setMessage] = useState("");
@@ -1181,7 +1183,10 @@ export function RevertButton({
   async function submit() {
     const response = await fetch(`/api/entries/${entryId}/revert`, {
       method: "POST",
-      headers: authHeaders("clinician"),
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${actorToken}`
+      },
       body: JSON.stringify({ expectedVersion, revertToVersion: version })
     });
     const payload = await response.json();

@@ -33,15 +33,19 @@ export default async function ClinicsPage({
   return (
     <AppShell demo={demo} clinicName={actor?.clinicName ?? "Platform"}>
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-        <header className="flex flex-wrap items-start justify-between gap-4">
-          <div className="max-w-4xl">
-            <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Platform administration</p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight">Clinics</h1>
+        <header>
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Platform administration</p>
+              <h1 className="mt-2 text-3xl font-semibold tracking-tight">Clinics</h1>
+            </div>
+            {isPlatformAdmin ? <CreateClinicForm demo={demo} profiles={(profiles ?? []) as AvailableProfile[]} /> : null}
+          </div>
+          <div className="mt-2 w-full">
             <p className="mt-2 text-stone-700">
               Provision clinics using the existing membership and RLS model. Production invitations are not implemented in this prototype.
             </p>
           </div>
-          {isPlatformAdmin ? <CreateClinicForm demo={demo} profiles={(profiles ?? []) as AvailableProfile[]} /> : null}
         </header>
 
         <div className="mt-6 grid gap-4">

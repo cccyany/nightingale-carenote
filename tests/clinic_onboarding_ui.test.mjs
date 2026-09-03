@@ -34,6 +34,8 @@ test("Avery has platform clinic directory and create-clinic navigation", () => {
   assert.match(loginPage, /Enter platform admin/);
   assert.match(clinicDirectory, /Platform administration/);
   assert.match(clinicDirectory, /CreateClinicForm/);
+  assert.match(clinicDirectory, /<header>/);
+  assert.match(clinicDirectory, /<div className="mt-2 w-full">[\s\S]*Provision clinics using the existing membership and RLS model\. Production invitations are not implemented in this prototype\./);
 });
 
 test("role-specific navigation separates platform admin from clinic admin", () => {
