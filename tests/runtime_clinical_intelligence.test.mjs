@@ -93,7 +93,7 @@ test("voice runtime intelligence attaches direct transcript segment provenance f
     "Speaker 0: Do you have any medication allergies?",
     "Speaker 1: Yes. Penicillin.",
     "Speaker 0: Are you taking any regular medication?",
-    "Speaker 1: I take metformin 500 mg twice a day."
+    "Speaker 1: I take metformin 500 milligrams twice a day."
   ].join("\n");
 
   const result = await persistRuntimeClinicalIntelligence({
@@ -108,7 +108,7 @@ test("voice runtime intelligence attaches direct transcript segment provenance f
       { id: "segment-question", speaker: "unknown", display_speaker: "Speaker 0", start_ms: 100, end_ms: 2400, text: "Do you have any medication allergies?" },
       { id: "segment-answer", speaker: "unknown", display_speaker: "Speaker 1", start_ms: 4000, end_ms: 6700, text: "Yes. Penicillin." },
       { id: "segment-med-question", speaker: "unknown", display_speaker: "Speaker 0", start_ms: 9000, end_ms: 11000, text: "Are you taking any regular medication?" },
-      { id: "segment-med-answer", speaker: "unknown", display_speaker: "Speaker 1", start_ms: 13000, end_ms: 17000, text: "I take metformin 500 mg twice a day." }
+      { id: "segment-med-answer", speaker: "unknown", display_speaker: "Speaker 1", start_ms: 13000, end_ms: 17000, text: "I take metformin 500 milligrams twice a day." }
     ]
   });
 
@@ -121,8 +121,11 @@ test("voice runtime intelligence attaches direct transcript segment provenance f
   const spanCalls = supabase.calls.filter((call) => call.name === "create_voice_provenance_for_transcript_span");
   const answerSpan = spanCalls.find((call) => call.params.p_evidence_text === "Speaker 1: Yes. Penicillin.");
   const questionSpan = spanCalls.find((call) => call.params.p_evidence_text === "Speaker 0: Do you have any medication allergies?");
+  const dosageSpan = spanCalls.find((call) => call.params.p_evidence_text === "metformin 500 milligrams");
   assert.equal(answerSpan.params.p_transcript_segment_id, "segment-answer");
   assert.equal(questionSpan.params.p_transcript_segment_id, "segment-question");
+  assert.equal(dosageSpan.params.p_transcript_segment_id, "segment-med-answer");
+  assert.equal(sourceTranscript.slice(dosageSpan.params.p_char_start, dosageSpan.params.p_char_end), "metformin 500 milligrams");
 });
 
 test("runtime AI Scribe does not create Glance cards for low-value unsupported text", async () => {

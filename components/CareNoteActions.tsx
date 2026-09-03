@@ -61,6 +61,8 @@ const patientContentTypes = [
   ["general_update", "General patient update"]
 ];
 
+type ConflictResolutionOutcome = "accept_fact_a" | "accept_fact_b" | "corrected_value" | "unable_to_determine";
+
 function authHeaders(role: string) {
   return {
     "content-type": "application/json",
@@ -938,15 +940,19 @@ export function ConflictResolutionForm({
   conflictId,
   status,
   conflictType,
-  actorRole
+  actorRole,
+  earlierOutcome = "accept_fact_a",
+  laterOutcome = "accept_fact_b"
 }: {
   conflictId: string;
   status: string;
   conflictType: string;
   actorRole?: string;
+  earlierOutcome?: "accept_fact_a" | "accept_fact_b";
+  laterOutcome?: "accept_fact_a" | "accept_fact_b";
 }) {
   const router = useRouter();
-  const [outcome, setOutcome] = useState("accept_fact_a");
+  const [outcome, setOutcome] = useState<ConflictResolutionOutcome>(earlierOutcome);
   const [rationale, setRationale] = useState("");
   const [entityType, setEntityType] = useState("medication");
   const [normalizedEntity, setNormalizedEntity] = useState("");
@@ -1006,9 +1012,9 @@ export function ConflictResolutionForm({
       <div className="mt-2 space-y-2">
         <label className="block font-medium">
           Decision
-          <select className="mt-1 w-full rounded border border-stone-300 p-2" onChange={(event) => setOutcome(event.target.value)} value={outcome}>
-            <option value="accept_fact_a">Earlier evidence is current/correct</option>
-            <option value="accept_fact_b">Later evidence is current/correct</option>
+          <select className="mt-1 w-full rounded border border-stone-300 p-2" onChange={(event) => setOutcome(event.target.value as ConflictResolutionOutcome)} value={outcome}>
+            <option value={earlierOutcome}>Earlier evidence is current/correct</option>
+            <option value={laterOutcome}>Later evidence is current/correct</option>
             <option value="corrected_value">Neither is correct - enter corrected information</option>
             <option value="unable_to_determine">Unable to determine - keep under review</option>
           </select>

@@ -18,6 +18,7 @@ import {
 } from "@/components/CareNoteActions";
 import { EvidenceText } from "@/components/EvidenceText";
 import { getClinicAssignableUsers, getPatientCareNote, type CareNoteEntry } from "@/lib/carenote-data";
+import { chronologicalConflictEvidence, outcomeForConflictEvidenceSide } from "@/lib/conflict-presentation";
 import { demoUsers } from "@/lib/demo-data";
 import { isValidationNoiseText, presentableGlanceItems } from "@/lib/glance-presentation";
 import { filterForRole } from "@/lib/timeline-filters";
@@ -508,6 +509,10 @@ export default async function PatientPage({
                     const factB = factById.get(conflict.fact_b_id);
                     const entryA = factA?.provenance_spans?.entry_id ? entryById.get(factA.provenance_spans.entry_id) : undefined;
                     const entryB = factB?.provenance_spans?.entry_id ? entryById.get(factB.provenance_spans.entry_id) : undefined;
+                    const [earlierEvidence, laterEvidence] = chronologicalConflictEvidence([
+                      { side: "fact_a", fact: factA, entry: entryA },
+                      { side: "fact_b", fact: factB, entry: entryB }
+                    ]);
                     return (
                       <div className={`rounded-md border p-3 text-sm ${conflict.status === "unresolved" || conflict.status === "needs_further_review" ? "border-red-200 bg-red-50/70" : "border-stone-200 bg-stone-50"}`} id={`conflict-${conflict.id}`} key={conflict.id}>
                         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -517,16 +522,16 @@ export default async function PatientPage({
                         <div className="mt-3 grid gap-2">
                           <div className="rounded border border-white bg-white/80 p-2">
                             <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Earlier evidence</p>
-                            <p className="mt-1">{factSummary(factA)}</p>
-                            <p className="text-xs text-stone-600">{entryA ? `${dateLabel(entryA.occurred_at)} - ${roleBadge(entryA)}` : "Source entry retained in provenance"}</p>
-                            {entryA ? <Link className="mt-1 inline-flex text-xs font-medium text-teal-800 hover:underline" href={`/patients/${id}?demo=${encodeURIComponent(demo)}&source=${entryA.id}&span=${factA?.provenance_span_id ?? ""}#entry-${entryA.id}`}>View source -&gt;</Link> : null}
+                            <p className="mt-1">{factSummary(earlierEvidence.fact)}</p>
+                            <p className="text-xs text-stone-600">{earlierEvidence.entry ? `${dateLabel(earlierEvidence.entry.occurred_at)} - ${roleBadge(earlierEvidence.entry)}` : "Source entry retained in provenance"}</p>
+                            {earlierEvidence.entry ? <Link className="mt-1 inline-flex text-xs font-medium text-teal-800 hover:underline" href={`/patients/${id}?demo=${encodeURIComponent(demo)}&source=${earlierEvidence.entry.id}&span=${earlierEvidence.fact?.provenance_span_id ?? ""}#entry-${earlierEvidence.entry.id}`}>View source -&gt;</Link> : null}
                           </div>
                           <div className="text-center text-xs font-semibold text-stone-500">VS</div>
                           <div className="rounded border border-white bg-white/80 p-2">
                             <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Later evidence</p>
-                            <p className="mt-1">{factSummary(factB)}</p>
-                            <p className="text-xs text-stone-600">{entryB ? `${dateLabel(entryB.occurred_at)} - ${roleBadge(entryB)}` : "Source entry retained in provenance"}</p>
-                            {entryB ? <Link className="mt-1 inline-flex text-xs font-medium text-teal-800 hover:underline" href={`/patients/${id}?demo=${encodeURIComponent(demo)}&source=${entryB.id}&span=${factB?.provenance_span_id ?? ""}#entry-${entryB.id}`}>View source -&gt;</Link> : null}
+                            <p className="mt-1">{factSummary(laterEvidence.fact)}</p>
+                            <p className="text-xs text-stone-600">{laterEvidence.entry ? `${dateLabel(laterEvidence.entry.occurred_at)} - ${roleBadge(laterEvidence.entry)}` : "Source entry retained in provenance"}</p>
+                            {laterEvidence.entry ? <Link className="mt-1 inline-flex text-xs font-medium text-teal-800 hover:underline" href={`/patients/${id}?demo=${encodeURIComponent(demo)}&source=${laterEvidence.entry.id}&span=${laterEvidence.fact?.provenance_span_id ?? ""}#entry-${laterEvidence.entry.id}`}>View source -&gt;</Link> : null}
                           </div>
                         </div>
                         <dl className="mt-3 space-y-1 text-xs text-stone-700">
@@ -554,7 +559,14 @@ export default async function PatientPage({
                             ) : null}
                           </div>
                         ) : null}
-                        <ConflictResolutionForm conflictId={conflict.id} status={conflict.status} conflictType={conflict.conflict_type} actorRole={actor?.role} />
+                        <ConflictResolutionForm
+                          actorRole={actor?.role}
+                          conflictId={conflict.id}
+                          conflictType={conflict.conflict_type}
+                          earlierOutcome={outcomeForConflictEvidenceSide(earlierEvidence.side)}
+                          laterOutcome={outcomeForConflictEvidenceSide(laterEvidence.side)}
+                          status={conflict.status}
+                        />
                       </div>
                     );
                   })}

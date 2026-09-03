@@ -102,6 +102,7 @@ test("dosage extraction recognizes compact mg and milligram variants as mg", () 
     assert.equal(dosage.value, "500");
     assert.equal(dosage.unit, "mg");
     assert.equal(content.slice(dosage.charStart, dosage.charEnd), dosage.sourceEvidenceText);
+    assert.match(dosage.sourceEvidenceText, /^metformin 500 (?:mg|milligram|milligrams)$/i);
   }
 });
 
