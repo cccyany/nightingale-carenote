@@ -18,9 +18,9 @@ import {
 } from "@/components/CareNoteActions";
 import { EvidenceText } from "@/components/EvidenceText";
 import { getClinicAssignableUsers, getPatientCareNote, type CareNoteEntry } from "@/lib/carenote-data";
+import { demoUsers } from "@/lib/demo-data";
 import { isValidationNoiseText, presentableGlanceItems } from "@/lib/glance-presentation";
 import { filterForRole } from "@/lib/timeline-filters";
-import { transcriptSourceForDisplay } from "@/lib/ai/scribe";
 
 const filters = [
   ["all", "All"],
@@ -177,6 +177,27 @@ function firstTranscriptSpan(entry: CareNoteEntry) {
   return entry.provenance_spans?.find((span) => span.provenance_sources?.source_kind === "transcript" && span.provenance_sources.source_content) ?? null;
 }
 
+function transcriptSpans(entry: CareNoteEntry) {
+  return entry.provenance_spans?.filter((span) => span.provenance_sources?.source_kind === "transcript" && span.provenance_sources.source_content) ?? [];
+}
+
+function evidenceRangesForTranscript(entry: CareNoteEntry, sourceContent: string) {
+  return transcriptSpans(entry)
+    .map((span) => ({
+      start: span.char_start,
+      end: span.char_end,
+      id: span.id
+    }))
+    .filter((range): range is { start: number; end: number; id: string } =>
+      range.start !== null &&
+      range.end !== null &&
+      range.start >= 0 &&
+      range.end > range.start &&
+      range.end <= sourceContent.length
+    )
+    .sort((left, right) => left.start - right.start);
+}
+
 function directTranscriptSegment(span: NonNullable<CareNoteEntry["provenance_spans"]>[number] | null) {
   const segment = span?.transcript_segments;
   if (!segment) return null;
@@ -187,6 +208,38 @@ function directTranscriptSegment(span: NonNullable<CareNoteEntry["provenance_spa
     startMs: segment.start_ms,
     endMs: segment.end_ms
   };
+}
+
+function directTranscriptSegments(entry: CareNoteEntry) {
+  const seen = new Set<string>();
+  return transcriptSpans(entry)
+    .map((span) => directTranscriptSegment(span))
+    .filter((segment): segment is NonNullable<ReturnType<typeof directTranscriptSegment>> => Boolean(segment))
+    .filter((segment) => {
+      const key = `${segment.startMs}:${segment.endMs}:${segment.label}:${segment.text}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort((left, right) => left.startMs - right.startMs);
+}
+
+function patientSafeDemoTokenForProfile(profileId: string | null | undefined) {
+  return demoUsers.find((user) => user.role === "patient" && user.profileId === profileId)?.token ?? null;
+}
+
+function MultiEvidenceText({ content, ranges }: { content: string; ranges: Array<{ start: number; end: number; id: string }> }) {
+  if (!ranges.length) return <p className="mt-3 whitespace-pre-wrap">{content}</p>;
+  const parts = [];
+  let cursor = 0;
+  for (const range of ranges) {
+    if (range.start < cursor) continue;
+    if (range.start > cursor) parts.push(content.slice(cursor, range.start));
+    parts.push(<mark className="rounded bg-amber-200 px-1" key={range.id}>{content.slice(range.start, range.end)}</mark>);
+    cursor = range.end;
+  }
+  if (cursor < content.length) parts.push(content.slice(cursor));
+  return <p className="mt-3 whitespace-pre-wrap">{parts}</p>;
 }
 
 export default async function PatientPage({
@@ -217,6 +270,7 @@ export default async function PatientPage({
   const result = await getPatientCareNote(id, filter, demo);
   const assignableUsers = await getClinicAssignableUsers(result.patient.clinic_id, demo);
   const actor = actorForDemo(demo);
+  const patientSafeDemoToken = patientSafeDemoTokenForProfile(result.patient.profile_id);
   const sourceEntryId = resolvedSearch?.source;
   const sourceSpanId = resolvedSearch?.span;
   const patientDraftSourceId = resolvedSearch?.patientDraftSource;
@@ -259,7 +313,7 @@ export default async function PatientPage({
   })) satisfies PatientDraftSourceEntry[];
 
   return (
-    <AppShell demo={demo} patientId={id} patientName={result.patient.display_name} clinicName={result.patient.clinics?.name ?? actor?.clinicName}>
+    <AppShell demo={demo} patientId={id} patientSafeDemoToken={patientSafeDemoToken} patientName={result.patient.display_name} clinicName={result.patient.clinics?.name ?? actor?.clinicName}>
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <nav className="mb-3 flex flex-wrap items-center gap-2 text-sm text-stone-600" aria-label="Breadcrumb">
           <Link className="font-medium text-teal-800 hover:underline focus:outline-none focus:ring-2 focus:ring-teal-600" href={`/patients?demo=${encodeURIComponent(demo)}`}>
@@ -279,7 +333,9 @@ export default async function PatientPage({
               </p>
             </div>
             <div className="flex flex-wrap gap-2 text-sm">
-              <Link className="rounded-md border border-teal-700 px-3 py-2 font-medium text-teal-900 hover:bg-teal-50 focus:outline-none focus:ring-2 focus:ring-teal-600" href="/patient/me?demo=demo-patient">Patient-safe view</Link>
+              {patientSafeDemoToken ? (
+                <Link className="rounded-md border border-teal-700 px-3 py-2 font-medium text-teal-900 hover:bg-teal-50 focus:outline-none focus:ring-2 focus:ring-teal-600" href={`/patient/me?demo=${encodeURIComponent(patientSafeDemoToken)}`}>Patient-safe view</Link>
+              ) : null}
               <Link className="rounded-md border border-stone-300 px-3 py-2 font-medium hover:bg-stone-50 focus:outline-none focus:ring-2 focus:ring-teal-600" href={`/patients/${id}/history?demo=${encodeURIComponent(demo)}&entry=${visibleEntries[0]?.id ?? ""}`}>History</Link>
             </div>
           </div>
@@ -325,11 +381,8 @@ export default async function PatientPage({
                         const showHighlight = sourceEntryId === entry.id && !aiMeta;
                         const transcriptSpan = aiMeta ? firstTranscriptSpan(entry) : null;
                         const transcriptSource = transcriptSpan?.provenance_sources?.source_content ?? "";
-                        const transcriptDisplay = transcriptSpan
-                          ? transcriptSourceForDisplay(transcriptSource, transcriptSpan.char_start, transcriptSpan.char_end)
-                          : null;
-                        const transcriptSegment = directTranscriptSegment(transcriptSpan);
-                        const segmentEvidenceStart = transcriptSegment && transcriptSpan ? transcriptSegment.text.indexOf(transcriptSpan.evidence_text.replace(/^[^:]+:\s*/, "")) : -1;
+                        const transcriptRanges = aiMeta && transcriptSource ? evidenceRangesForTranscript(entry, transcriptSource) : [];
+                        const linkedTranscriptSegments = aiMeta ? directTranscriptSegments(entry) : [];
                         return (
                           <article
                             className={`scroll-mt-24 rounded-md border p-4 ${entryTone(entry.author_role)} ${sourceEntryId === entry.id ? "ring-2 ring-amber-400" : ""}`}
@@ -384,23 +437,20 @@ export default async function PatientPage({
                               <details className={`mt-3 rounded-md border p-3 ${sourceEntryId === entry.id ? "border-amber-300 bg-amber-50" : "border-amber-200 bg-white/70"}`} open={sourceEntryId === entry.id}>
                                 <summary className={entryActionSummaryClass}>Review source</summary>
                                 <p className="mt-2 text-xs text-stone-600">Source transcript. Highlighted text is exact source evidence; the generated summary remains needs verification.</p>
-                                {transcriptSegment ? (
-                                  <div className="mt-2 rounded border border-stone-200 bg-white p-3 text-sm leading-6 text-stone-800">
-                                    <p className="text-xs font-medium text-stone-500">
-                                      {transcriptSegment.startMs}ms-{transcriptSegment.endMs}ms · {transcriptSegment.label}
-                                      {transcriptSegment.rawLabel && transcriptSegment.rawLabel !== transcriptSegment.label ? ` · raw ${transcriptSegment.rawLabel}` : ""}
-                                    </p>
-                                    <EvidenceText
-                                      content={transcriptSegment.text}
-                                      evidenceStart={segmentEvidenceStart >= 0 ? segmentEvidenceStart : null}
-                                      evidenceEnd={segmentEvidenceStart >= 0 ? segmentEvidenceStart + transcriptSpan.evidence_text.replace(/^[^:]+:\s*/, "").length : null}
-                                    />
+                                <div className="mt-2 max-h-72 overflow-auto rounded border border-stone-200 bg-white p-3 text-sm leading-6 text-stone-800">
+                                  <MultiEvidenceText content={transcriptSource} ranges={transcriptRanges} />
+                                </div>
+                                {linkedTranscriptSegments.length ? (
+                                  <div className="mt-2 space-y-1 text-xs text-stone-600">
+                                    <p className="font-medium text-stone-700">Linked evidence segments</p>
+                                    {linkedTranscriptSegments.map((segment) => (
+                                      <p key={`${segment.startMs}:${segment.endMs}:${segment.text}`}>
+                                        {segment.startMs}ms-{segment.endMs}ms · {segment.label}
+                                        {segment.rawLabel && segment.rawLabel !== segment.label ? ` · raw ${segment.rawLabel}` : ""}
+                                      </p>
+                                    ))}
                                   </div>
-                                ) : (
-                                  <div className="mt-2 max-h-52 overflow-auto rounded border border-stone-200 bg-white p-3 text-sm leading-6 text-stone-800">
-                                    <EvidenceText content={transcriptDisplay?.content ?? transcriptSource} evidenceStart={transcriptDisplay?.evidenceStart} evidenceEnd={transcriptDisplay?.evidenceEnd} />
-                                  </div>
-                                )}
+                                ) : null}
                                 {transcriptSpan.transcript_start_ms !== null && transcriptSpan.transcript_end_ms !== null ? (
                                   <p className="mt-2 text-xs text-stone-600">Transcript segment: {transcriptSpan.transcript_start_ms}ms-{transcriptSpan.transcript_end_ms}ms</p>
                                 ) : null}

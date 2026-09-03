@@ -6,6 +6,7 @@ import { demoUsers } from "@/lib/demo-data";
 type AppShellProps = {
   demo?: string;
   patientId?: string;
+  patientSafeDemoToken?: string | null;
   patientName?: string;
   clinicName?: string;
   children: ReactNode;
@@ -21,7 +22,7 @@ export function actorForDemo(demo?: string) {
   return demoUsers.find((user) => user.token === demo);
 }
 
-export function AppShell({ demo, patientId, patientName, clinicName, children, patientView = false }: AppShellProps) {
+export function AppShell({ demo, patientId, patientSafeDemoToken, patientName, clinicName, children, patientView = false }: AppShellProps) {
   const actor = actorForDemo(demo);
   const activeClinic = clinicName ?? actor?.clinicName ?? "Clinic";
   const patientsHref = demo ? `/patients?demo=${encodeURIComponent(demo)}` : "/login";
@@ -78,8 +79,8 @@ export function AppShell({ demo, patientId, patientName, clinicName, children, p
                 Clinic management
               </Link>
             ) : null}
-            {patientId ? (
-            <Link className="rounded-md border border-teal-200 px-3 py-2 text-teal-900 hover:bg-teal-50 focus:outline-none focus:ring-2 focus:ring-teal-600" href="/patient/me?demo=demo-patient">
+            {patientId && patientSafeDemoToken ? (
+            <Link className="rounded-md border border-teal-200 px-3 py-2 text-teal-900 hover:bg-teal-50 focus:outline-none focus:ring-2 focus:ring-teal-600" href={`/patient/me?demo=${encodeURIComponent(patientSafeDemoToken)}`}>
               Patient-safe view
             </Link>
             ) : null}

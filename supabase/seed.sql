@@ -21,8 +21,94 @@ where title like 'Synthetic patient approval%'
    or title like 'Synthetic versioned patient draft%'
    or title = 'Synthetic unresolved draft';
 
-delete from transcript_sessions
-where source_label like 'Synthetic ambient consult test%';
+with synthetic_voice_sessions as (
+  select id, summary_entry_id
+  from transcript_sessions
+  where source_label like 'Synthetic ambient consult test%'
+),
+synthetic_voice_entries as (
+  select summary_entry_id as id
+  from synthetic_voice_sessions
+  where summary_entry_id is not null
+),
+synthetic_voice_segments as (
+  select id
+  from transcript_segments
+  where session_id in (select id from synthetic_voice_sessions)
+),
+synthetic_voice_sources as (
+  select id
+  from provenance_sources
+  where source_session_identifier in (select id::text from synthetic_voice_sessions)
+     or source_entry_id in (select id from synthetic_voice_entries)
+),
+synthetic_voice_spans as (
+  select id
+  from provenance_spans
+  where source_id in (select id from synthetic_voice_sources)
+     or entry_id in (select id from synthetic_voice_entries)
+     or transcript_segment_id in (select id from synthetic_voice_segments)
+),
+deleted_feedback as (
+  delete from importance_feedback ifb
+  using highlights h
+  where ifb.highlight_id = h.id
+    and h.provenance_span_id in (select id from synthetic_voice_spans)
+  returning ifb.id
+),
+deleted_glance as (
+  delete from glance_items gi
+  where gi.provenance_span_id in (select id from synthetic_voice_spans)
+     or gi.highlight_id in (
+      select h.id from highlights h where h.provenance_span_id in (select id from synthetic_voice_spans)
+     )
+  returning gi.id
+),
+deleted_highlights as (
+  delete from highlights h
+  where h.provenance_span_id in (select id from synthetic_voice_spans)
+  returning h.id
+),
+deleted_conflicts as (
+  delete from fact_conflicts fc
+  where fc.fact_a_id in (
+      select cf.id from clinical_facts cf where cf.source_entry_id in (select id from synthetic_voice_entries)
+         or cf.provenance_span_id in (select id from synthetic_voice_spans)
+    )
+     or fc.fact_b_id in (
+      select cf.id from clinical_facts cf where cf.source_entry_id in (select id from synthetic_voice_entries)
+         or cf.provenance_span_id in (select id from synthetic_voice_spans)
+    )
+  returning fc.id
+),
+deleted_facts as (
+  delete from clinical_facts cf
+  where cf.source_entry_id in (select id from synthetic_voice_entries)
+     or cf.provenance_span_id in (select id from synthetic_voice_spans)
+  returning cf.id
+),
+deleted_spans as (
+  delete from provenance_spans psn
+  where psn.id in (select id from synthetic_voice_spans)
+  returning psn.id
+),
+deleted_sources as (
+  delete from provenance_sources ps
+  where ps.id in (select id from synthetic_voice_sources)
+  returning ps.id
+),
+deleted_entries as (
+  delete from care_entries ce
+  where ce.id in (select id from synthetic_voice_entries)
+  returning ce.id
+),
+deleted_segments as (
+  delete from transcript_segments ts
+  where ts.id in (select id from synthetic_voice_segments)
+  returning ts.id
+)
+delete from transcript_sessions ts
+where ts.id in (select id from synthetic_voice_sessions);
 
 delete from highlights
 where title like 'Synthetic baseline cough candidate%'

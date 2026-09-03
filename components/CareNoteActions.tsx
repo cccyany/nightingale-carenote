@@ -86,11 +86,6 @@ function timeLabel(value: string) {
   return new Intl.DateTimeFormat("en-SG", { timeStyle: "short", timeZone: "Asia/Singapore" }).format(new Date(value));
 }
 
-function preview(content: string, max = 130) {
-  const text = content.replace(/\s+/g, " ").trim();
-  return text.length > max ? `${text.slice(0, max - 3)}...` : text;
-}
-
 function sourceLabel(entry: PatientDraftSourceEntry) {
   if (entry.author_role === "system") return "AI Scribe";
   if (entry.entry_type === "clinician_note") return "Clinician note";

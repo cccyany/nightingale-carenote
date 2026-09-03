@@ -83,7 +83,7 @@ export function isValidationNoiseGlance(item: GlancePresentationItem) {
   return isValidationNoiseText(`${item.title} ${item.short_summary} ${item.risk_reason}`);
 }
 
-function glanceKey(item: GlancePresentationItem) {
+export function glanceSemanticKey(item: GlancePresentationItem) {
   const title = item.title.toLowerCase();
   if (title.includes("allergy") && title.includes("conflict")) return "allergy_conflict";
   if (title.includes("dose") && title.includes("conflict")) return "medication_dose_conflict";
@@ -97,7 +97,7 @@ export function presentableGlanceItems<T extends GlancePresentationItem>(items: 
   const seen = new Set<string>();
   return items.filter((item) => {
     if (isValidationNoiseGlance(item)) return false;
-    const key = glanceKey(item);
+    const key = glanceSemanticKey(item);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;

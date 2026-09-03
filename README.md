@@ -15,7 +15,8 @@ Open `/login` and use the synthetic demo-role navigation:
 - `patient.jane@example.test` / Jane Tan patient-safe view
 - `staff.a@example.test` / Clinic A staff workflow
 - `clinician.a@example.test` / Clinic A clinician review and approval
-- `admin.a@example.test` / Clinic A scoped oversight
+- `admin.a@example.test` / Avery Ong platform administration
+- `clinic.admin.a@example.test` / Clara Ng Clinic A administration
 - `staff.b@example.test` / Clinic B isolation test user
 
 Jane Tan is the golden demo patient in Clinic A:

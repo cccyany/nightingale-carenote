@@ -9,7 +9,6 @@ const clinicDetail = readFileSync("app/admin/clinics/[clinicId]/page.tsx", "utf8
 const clinicActions = readFileSync("components/ClinicManagementActions.tsx", "utf8");
 const demoPersonActions = readFileSync("components/DemoPersonActions.tsx", "utf8");
 const patientMePage = readFileSync("app/patient/me/page.tsx", "utf8");
-const demoAccess = readFileSync("lib/demo-access.ts", "utf8");
 const demoData = readFileSync("lib/demo-data.ts", "utf8");
 const demoAccessMigration = readFileSync("supabase/migrations/025_demo_identity_access.sql", "utf8");
 const supabaseRequest = readFileSync("lib/supabase/request.ts", "utf8");
@@ -73,6 +72,23 @@ test("Alex Lim is a Clinic B patient demo identity, not a staff-routed patient r
   assert.doesNotMatch(loginPage, /\/patients\/\$\{patient\.id\}\?demo=\$\{careTeamActor\.token\}/);
   assert.match(patientMePage, /actor\?\.role !== "patient"/);
   assert.doesNotMatch(patientMePage, /demo !== "demo-patient"/);
+});
+
+test("patient-safe CareNote shortcut uses the matching patient demo identity", () => {
+  const patientPage = readFileSync("app/patients/[id]/page.tsx", "utf8");
+  assert.match(appShell, /patientSafeDemoToken/);
+  assert.match(patientPage, /patientSafeDemoTokenForProfile/);
+  assert.match(patientPage, /profileId === profileId/);
+  assert.doesNotMatch(patientPage, /href="\/patient\/me\?demo=demo-patient"/);
+  assert.doesNotMatch(appShell, /href="\/patient\/me\?demo=demo-patient"/);
+});
+
+test("AI Scribe Review Source renders full transcript while preserving linked segments", () => {
+  const patientPage = readFileSync("app/patients/[id]/page.tsx", "utf8");
+  assert.match(patientPage, /MultiEvidenceText content=\{transcriptSource\} ranges=\{transcriptRanges\}/);
+  assert.match(patientPage, /Linked evidence segments/);
+  assert.match(patientPage, /directTranscriptSegments\(entry\)/);
+  assert.doesNotMatch(patientPage, /content=\{transcriptSegment\.text\}/);
 });
 
 test("clinic-level member and patient actions live inside clinic management", () => {

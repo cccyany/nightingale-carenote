@@ -9,6 +9,7 @@ export type DisplayClinic = { name: string } | null;
 export type CareNotePatient = {
   id: string;
   clinic_id: string;
+  profile_id: string | null;
   display_name: string;
   date_of_birth: string;
   clinics: DisplayClinic;
@@ -254,7 +255,7 @@ export async function getPatientCareNote(patientId: string, filter: TimelineFilt
   const supabase = await careReadClient(actorToken);
   const { data: patient, error: patientError } = await supabase
     .from("patients")
-    .select("id, clinic_id, display_name, date_of_birth, clinics(name)")
+    .select("id, clinic_id, profile_id, display_name, date_of_birth, clinics(name)")
     .eq("id", patientId)
     .single();
 

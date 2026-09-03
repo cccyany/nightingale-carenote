@@ -28,7 +28,7 @@ def staff_session():
 
 @pytest.fixture(scope="module")
 def admin_session():
-    return sign_in("admin.a@example.test")
+    return sign_in("clinic.admin.a@example.test")
 
 
 @pytest.fixture(scope="module")
